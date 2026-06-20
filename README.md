@@ -2,12 +2,12 @@
 
 A full-stack application that identifies and **ranks the drivers behind significant
 stock price drops** (ITS 836 course project). A FastAPI backend runs the four
-analysis sections; a static dashboard frontend visualises the metrics and figures.
+analysis sections; a React + Vite dashboard visualises the metrics and figures.
 
 ```
 stock_drops_app/
 ├── backend/      FastAPI app, models, tests
-└── frontend/     dashboard (HTML / CSS / JS)
+└── frontend/     React + Vite dashboard (light, WCAG 2.1 AA)
 ```
 
 ---
@@ -17,9 +17,11 @@ stock_drops_app/
 | Layer | Tech | Responsibility |
 |-------|------|----------------|
 | **Backend** | FastAPI + scikit-learn + XGBoost | data pipeline, four model sections, JSON API |
-| **Frontend** | Vanilla HTML/CSS/JS | dashboard that calls the API and renders tables + figures |
+| **Frontend** | React 18 + Vite | accessible (WCAG 2.1 AA) dashboard that calls the API and renders tables + figures |
 
-The backend serves the frontend, so running one process gives you the whole app.
+Once the frontend is built (`npm run build`), the backend serves the bundle, so a
+single process gives you the whole app. For UI development, run the Vite dev
+server alongside the backend — see [frontend/README.md](frontend/README.md).
 
 ### Backend layout (best-practice package)
 
@@ -67,9 +69,24 @@ venv\Scripts\activate.bat
 
 pip install -r requirements.txt
 
-# run the app (serves API + dashboard)
+# run the API (and the dashboard, once it's been built)
 python -m uvicorn app.main:app --reload --port 8000
 ```
+
+> **Python version:** use CPython 3.11–3.13 for the smoothest install. The data
+> stack runs on 3.14 too, but `setuptools` must be present (it ships in
+> `requirements.txt`) because `distutils` was removed from the stdlib in 3.12.
+
+### Frontend (one-time build, then served by the backend)
+
+```bash
+cd frontend
+npm install
+npm run build          # emits frontend/dist/, which the backend serves
+```
+
+For hot-reload UI development run `npm run dev` instead (Vite on :5173, proxies
+`/api` to the backend). Full details in [frontend/README.md](frontend/README.md).
 
 These activation commands assume your current directory is `backend/`. If you are
 already inside `backend/venv/`, use `source Scripts/activate` in Git Bash or move

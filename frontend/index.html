@@ -1,63 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Drop-Driver Analysis — ITS 836</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div class="shell">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="brand">
-        <!-- Signature: a declining sparkline that embodies the subject -->
-        <svg class="spark" viewBox="0 0 220 34" preserveAspectRatio="none" aria-hidden="true">
-          <polyline points="0,8 30,12 55,9 80,16 105,14 130,22 160,19 185,28 220,31"
-                    fill="none" stroke="#5B6CC4" stroke-width="2" />
-          <circle cx="220" cy="31" r="3.5" fill="#E5484D" />
-        </svg>
-        <div class="name">Drop-Driver Analysis</div>
-        <div class="sub">ITS 836 · Big Data Analytics</div>
-      </div>
-
-      <nav class="nav" id="nav">
-        <div class="nav-label">Analyses</div>
-        <!-- nav items injected by app.js -->
-      </nav>
-
-      <button class="run-all" id="runAll">Run full analysis</button>
-
-      <div class="health">
-        <span class="dot" id="healthDot"></span>
-        <span id="healthText">checking backend…</span>
-      </div>
-    </aside>
-
-    <!-- Main -->
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <h1>Drivers Behind Significant Price Drops</h1>
-          <p class="lede">Run each model section to identify and rank the factors most
-            associated with sharp single-day stock declines.</p>
-        </div>
-        <div class="pills" id="datasetPills"></div>
-      </header>
-
-      <section id="results">
-        <div class="empty">
-          <h2>Pick an analysis to begin</h2>
-          <p>Choose a section on the left, or run the full pipeline. Results appear here
-             as metrics tables and figures.</p>
-        </div>
-      </section>
-    </main>
-  </div>
-
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta
+      name="description"
+      content="Identify and rank the drivers behind significant single-day stock price drops."
+    />
+    <title>Drop-Driver Analysis — ITS 836</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>
