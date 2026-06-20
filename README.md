@@ -70,6 +70,21 @@ stratified splits), a fixed `random_state` for reproducibility, and deliberate
 **leakage avoidance** — `ret_1d` is excluded from the feature set because
 `is_drop` is derived from it.
 
+### Drop attribution: systematic vs. idiosyncratic
+
+A fall is only "explained" once you know whether the stock dropped *because the
+market/sector dropped* (beta) or because something hit the name specifically. So
+each day's return is decomposed via a **trailing-window regression on the market
+and its sector ETF** (no look-ahead): `systematic_ret = β_mkt·market + β_sec·sector`,
+and `idio_ret = ret − systematic`. Each drop is then classified **market/sector-driven**,
+**stock-specific** or **mixed** (`core/factors.py`). Macro context is attached too
+(`core/macro_calendar.py`): the same-day **10-year yield move (bp)** as an unbiased
+rate-shock proxy, and proximity to a **scheduled FOMC date**. These are
+attribution-only signals — never model features (they are same-day, so using them
+to predict would be leakage). *Honest limitation:* true CPI/PCE/dot-plot
+**surprises** (actual vs. consensus) need a paid macro feed and are not included;
+the rate-move magnitude is the proxy used instead.
+
 ---
 
 ## Quick start
