@@ -12,8 +12,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel, Field
 
-from app.config import get_settings
+from app.config import TICKER_CATALOG, get_settings
 from app.exceptions import (ConfigurationError, DataSourceError,
                             InsufficientDataError, ModelError, StockDropsError)
 from app.logging_config import get_logger
@@ -65,6 +66,23 @@ def health() -> dict:
 def sections() -> dict:
     return {"sections": [{"key": k, "title": t}
                          for k, (t, _) in analysis_service.SECTIONS.items()]}
+
+
+@app.get("/api/tickers")
+def tickers() -> dict:
+    """Curated universe for the frontend picker (users may also add others)."""
+    return {"catalog": TICKER_CATALOG}
+
+
+class SelectionRequest(BaseModel):
+    tickers: list[str] = Field(default_factory=list, description="Yahoo symbols to analyze.")
+
+
+@app.post("/api/analyze")
+def analyze_selection(req: SelectionRequest) -> dict:
+    """Run the full pipeline on a user-selected set of tickers and explain why
+    each one fell. Invalid selections raise ConfigurationError -> HTTP 400."""
+    return analysis_service.run_selection(req.tickers)
 
 
 @app.get("/api/analyze/{section}")

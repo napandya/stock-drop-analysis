@@ -161,8 +161,20 @@ python -m pytest          # all tests run on synthetic data, no network needed
 |--------|------|---------|
 | GET | `/api/health` | status, data mode, configured tickers |
 | GET | `/api/sections` | the four available analysis sections |
-| GET | `/api/analyze/{section}` | metrics + figures for one section |
-| GET | `/api/analyze` | the full pipeline (all four sections) |
+| GET | `/api/tickers` | curated ticker catalog for the picker |
+| GET | `/api/analyze/{section}` | metrics + figures for one section (default universe) |
+| GET | `/api/analyze` | the full pipeline on the default universe |
+| POST | `/api/analyze` | full pipeline on a **chosen** set of tickers, plus per-company explanations — body `{"tickers": ["AAPL", "NVDA", …]}` (2–8 symbols) |
 
 Errors return a typed JSON body, e.g. `{"error": "DataSourceError", "detail": "..."}`,
-with the matching HTTP status (503 upstream down, 422 insufficient data, 500 model error).
+with the matching HTTP status (400 invalid tickers, 503 upstream down, 422 insufficient data, 500 model error).
+
+### Pick companies & explain their falls
+
+`POST /api/analyze` runs all four sections on a user-selected universe and adds an
+`explanations` block: for each stock it finds the worst drop day(s) and ranks the
+drivers by **model importance × how abnormal the feature was that day** (in the
+drop-associated direction), turning them into plain-language reasons (e.g. "the
+broad market sold off sharply", "trading volume was abnormally high"). The
+frontend exposes this as a ticker picker (curated list + custom symbols) and a
+"Why these stocks fell" panel.

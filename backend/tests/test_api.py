@@ -63,6 +63,30 @@ def test_analyze_ensembles():
     assert "dataset" in body and body["dataset"]["synthetic"] is True
 
 
+def test_tickers_catalog():
+    r = client.get("/api/tickers")
+    assert r.status_code == 200
+    catalog = r.json()["catalog"]
+    assert catalog and {"ticker", "name", "sector"} <= catalog[0].keys()
+
+
+def test_analyze_selection_returns_explanations():
+    r = client.post("/api/analyze", json={"tickers": ["AAA", "BBB", "CCC"]})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["dataset"]["synthetic"] is True
+    assert set(body["sections"]) >= {"regression", "classification", "ensembles", "clustering"}
+    exp = body["explanations"]
+    assert exp["title"] == "Why these stocks fell"
+    assert {e["ticker"] for e in exp["explanations"]} == {"AAA", "BBB", "CCC"}
+
+
+def test_analyze_selection_invalid_count_is_400():
+    r = client.post("/api/analyze", json={"tickers": ["AAA"]})  # below minimum
+    assert r.status_code == 400
+    assert r.json()["error"] == "ConfigurationError"
+
+
 def test_datasource_error_maps_to_503(monkeypatch):
     """A failed upstream fetch must surface as 503 with a typed error body --
     this is the exact path the distutils / pandas-datareader breakage hit."""
