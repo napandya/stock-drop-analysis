@@ -73,57 +73,101 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
 _FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
 
-def _parse_fred_csv(text: str, settings: Settings) -> pd.DataFrame:
-    """Parse a FRED ``fredgraph.csv`` payload into the macro feature frame.
+def _read_fred_csv(text: str) -> pd.DataFrame:
+    """Read one FRED ``fredgraph.csv`` payload into a date-indexed frame.
 
-    Pulled out as a pure function so it can be unit-tested without the network.
-    FRED marks missing observations with ``"."`` and the date column has been
-    ``DATE`` (legacy) or ``observation_date`` (current) over the years -- handle
-    both so a future rename does not silently break the pipeline.
+    Validates that the response actually *is* CSV before handing it to the
+    parser -- FRED occasionally answers with an HTML error/rate-limit page, and
+    feeding that to ``read_csv`` produces a cryptic "Error tokenizing data"
+    instead of an actionable message. The date column has been ``DATE`` (legacy)
+    or ``observation_date`` (current) over the years, so accept both.
     """
     import io
 
-    raw = pd.read_csv(io.StringIO(text))
+    head = text.lstrip()[:1]
+    first_line = text.strip().splitlines()[0] if text.strip() else ""
+    if head == "<" or "," not in first_line:
+        snippet = text.strip()[:160].replace("\n", " ")
+        raise ValueError(f"FRED did not return CSV (got: {snippet!r}).")
+
+    raw = pd.read_csv(io.StringIO(text), na_values=["."])
     date_col = next((c for c in ("observation_date", "DATE", "date") if c in raw.columns),
                     raw.columns[0])
     raw = raw.rename(columns={date_col: "date"})
     raw["date"] = pd.to_datetime(raw["date"])
+    return raw
 
-    # FRED uses "." for missing values; coerce every series to numeric.
+
+def _finalize_macro(frame: pd.DataFrame, settings: Settings) -> pd.DataFrame:
+    """Turn an assembled frame (``date`` + raw FRED series columns) into the
+    macro feature frame: rename, derive year-over-year CPI, forward-fill."""
     for code in settings.fred_series:
-        if code not in raw.columns:
+        if code not in frame.columns:
             raise ValueError(f"FRED response missing series '{code}'.")
-        raw[code] = pd.to_numeric(raw[code], errors="coerce")
+        frame[code] = pd.to_numeric(frame[code], errors="coerce")
 
-    series = raw.rename(columns=settings.fred_series).set_index("date")
-    series["cpi_yoy"] = series["cpi"].pct_change(12) * 100.0
+    series = frame.rename(columns=settings.fred_series).set_index("date").sort_index()
+
+    # CPI (CPIAUCSL) is monthly while the 10y yield is daily, so the merged frame
+    # has CPI only on month-start rows and NaN elsewhere. Year-over-year change
+    # must be computed on the *monthly* observations (12 periods = 12 months),
+    # then aligned back onto the daily index -- not via pct_change(12) on the
+    # daily frame, which would compare against 12 calendar days ago.
+    cpi_monthly = series["cpi"].dropna()
+    cpi_yoy = cpi_monthly.pct_change(12) * 100.0
+    series["cpi_yoy"] = cpi_yoy.reindex(series.index).ffill()
+
     macro = series[["treasury_10y", "cpi_yoy"]].ffill().reset_index()
     if macro.empty:
         raise ValueError("FRED returned an empty frame.")
     return macro
 
 
+def _parse_fred_csv(text: str, settings: Settings) -> pd.DataFrame:
+    """Parse a single combined ``fredgraph.csv`` payload into the macro frame.
+
+    Pure function (no network) so it can be unit-tested directly.
+    """
+    return _finalize_macro(_read_fred_csv(text), settings)
+
+
 def _load_macro(settings: Settings) -> pd.DataFrame:
+    """Fetch each FRED series in its own request and merge on date.
+
+    ``fredgraph.csv`` is only reliable one series at a time; a comma-joined
+    ``id=A,B`` can return an unexpected layout. Fetching per series (the same
+    approach ``pandas-datareader`` used) and outer-joining on date is robust.
+    """
     import requests
 
-    @_retryer(settings)
-    def _download() -> str:
-        resp = requests.get(
-            _FRED_CSV_URL,
-            params={
-                "id": ",".join(settings.fred_series),
-                "cosd": settings.date_start,
-                "coed": settings.date_end,
-            },
-            headers={"User-Agent": "stock-drop-analysis/1.0"},
-            timeout=settings.fetch_timeout_seconds,
-        )
-        resp.raise_for_status()
-        if not resp.text.strip():
-            raise ValueError("FRED returned an empty response.")
-        return resp.text
+    def _fetch(series_id: str) -> pd.DataFrame:
+        @_retryer(settings)
+        def _download() -> pd.DataFrame:
+            resp = requests.get(
+                _FRED_CSV_URL,
+                params={
+                    "id": series_id,
+                    "cosd": settings.date_start,
+                    "coed": settings.date_end,
+                },
+                headers={"User-Agent": "stock-drop-analysis/1.0"},
+                timeout=settings.fetch_timeout_seconds,
+            )
+            resp.raise_for_status()
+            if not resp.text.strip():
+                raise ValueError(f"FRED returned an empty response for '{series_id}'.")
+            return _read_fred_csv(resp.text)
 
-    return _parse_fred_csv(_download(), settings)
+        return _download()
+
+    merged: pd.DataFrame | None = None
+    for code in settings.fred_series:
+        part = _fetch(code)
+        keep = ["date", code] if code in part.columns else list(part.columns)
+        part = part[keep]
+        merged = part if merged is None else merged.merge(part, on="date", how="outer")
+
+    return _finalize_macro(merged, settings)
 
 
 # --------------------------------------------------------------------------

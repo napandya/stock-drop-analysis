@@ -99,3 +99,85 @@ def test_parse_fred_csv_missing_series_raises():
     bad = "observation_date,DGS10\n2021-02-01,1.16\n"  # CPIAUCSL absent
     with pytest.raises(ValueError):
         data_pipeline._parse_fred_csv(bad, s)
+
+
+def test_parse_fred_csv_rejects_html_with_clear_error():
+    """An HTML error/rate-limit page must raise an actionable ValueError, not a
+    cryptic pandas 'Error tokenizing data'."""
+    s = Settings()
+    html = "<!DOCTYPE html>\n<html><body><p>Service unavailable</p></body></html>\n"
+    with pytest.raises(ValueError, match="did not return CSV"):
+        data_pipeline._parse_fred_csv(html, s)
+
+
+def test_read_fred_csv_single_series():
+    """Per-series payloads (how _load_macro now fetches) parse to date + code."""
+    single = "observation_date,DGS10\n2021-02-01,1.16\n2021-02-02,1.13\n"
+    frame = data_pipeline._read_fred_csv(single)
+    assert list(frame.columns) == ["date", "DGS10"]
+    assert pd.api.types.is_datetime64_any_dtype(frame["date"])
+
+
+def test_cpi_yoy_computed_on_monthly_observations():
+    """CPI year-over-year must reflect a 12-*month* change, not 12 daily rows.
+
+    Build 13 monthly CPI points growing 0.5%/month alongside a daily-cadence
+    treasury column; the 13th month's YoY should be a real, non-NaN value.
+    """
+    s = Settings()
+    rows = ["observation_date,DGS10,CPIAUCSL"]
+    cpi = 100.0
+    for i in range(13):  # 2021-01 .. 2022-01
+        year = 2021 + (i // 12)
+        month = (i % 12) + 1
+        rows.append(f"{year}-{month:02d}-01,1.50,{cpi:.3f}")
+        cpi *= 1.005
+    macro = data_pipeline._parse_fred_csv("\n".join(rows) + "\n", s)
+
+    last = macro.iloc[-1]["cpi_yoy"]
+    assert pd.notna(last)
+    # 12 months of +0.5% compounding ≈ 6.17% YoY.
+    assert 5.5 < last < 7.0
+
+
+def test_load_macro_fetches_each_series_and_merges(monkeypatch):
+    """_load_macro must request each FRED series separately (daily + monthly)
+    and merge them on date -- exercised offline by stubbing requests.get."""
+    import requests
+
+    # Daily 10y yield across ~13 months, and monthly CPI for the same span.
+    dates = pd.date_range("2021-01-01", "2022-02-01", freq="B")
+    daily_csv = "observation_date,DGS10\n" + "".join(
+        f"{d.date()},1.50\n" for d in dates
+    )
+    cpi = 100.0
+    monthly_rows = []
+    for m in pd.date_range("2021-01-01", "2022-02-01", freq="MS"):
+        monthly_rows.append(f"{m.date()},{cpi:.3f}")
+        cpi *= 1.005
+    monthly_csv = "observation_date,CPIAUCSL\n" + "\n".join(monthly_rows) + "\n"
+
+    class _Resp:
+        def __init__(self, text):
+            self.text = text
+
+        def raise_for_status(self):
+            pass
+
+    requested = []
+
+    def _fake_get(url, params=None, **kwargs):
+        sid = params["id"]
+        requested.append(sid)
+        return _Resp(daily_csv if sid == "DGS10" else monthly_csv)
+
+    monkeypatch.setattr(requests, "get", _fake_get)
+
+    s = Settings(use_synthetic=False, fetch_max_attempts=1, fetch_backoff_seconds=0.01)
+    macro = data_pipeline._load_macro(s)
+
+    # One request per configured series, and both columns present after merge.
+    assert sorted(requested) == sorted(s.fred_series)
+    assert list(macro.columns) == ["date", "treasury_10y", "cpi_yoy"]
+    assert macro["treasury_10y"].notna().any()
+    assert macro["cpi_yoy"].notna().any()
