@@ -70,6 +70,10 @@ pip install -r requirements.txt
 python -m uvicorn app.main:app --reload --port 8000
 ```
 
+These activation commands assume your current directory is `backend/`. If you are
+already inside `backend/venv/`, use `source Scripts/activate` in Git Bash or move
+back up one level before following the quick-start commands.
+
 Open <http://127.0.0.1:8000> and click a section, or **Run full analysis**.
 
 ### Offline preview (no internet / no data)
