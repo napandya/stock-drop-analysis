@@ -120,10 +120,19 @@ class Settings(BaseSettings):
 
     # -- Paths ---------------------------------------------------------------
     data_dir: Path = BASE_DIR / "data"
-    sentiment_csv_name: str = "all-data.csv"
+    #: Candidate filenames for the FinancialPhraseBank sentiment dataset, tried
+    #: in order. The Kaggle download is "all-data.csv"; this repo ships
+    #: "FinancialPhraseBank.csv". Override the first entry via env if needed.
+    sentiment_csv_name: str = "FinancialPhraseBank.csv"
 
     @property
     def sentiment_csv(self) -> Path:
+        """First existing sentiment CSV among the known names (else the default)."""
+        for name in dict.fromkeys([self.sentiment_csv_name,
+                                   "FinancialPhraseBank.csv", "all-data.csv"]):
+            path = self.data_dir / name
+            if path.exists():
+                return path
         return self.data_dir / self.sentiment_csv_name
 
     def ensure_dirs(self) -> None:

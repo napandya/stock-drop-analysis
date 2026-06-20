@@ -32,9 +32,11 @@ def test_regression_result(dataset, settings):
 def test_classification_result(dataset, settings):
     out = classification.run(dataset, settings)
     assert "figures" in out and "drop_confusion" in out["figures"]
+    assert "sentiment_confusion" in out["figures"]
     _assert_walk_forward(out)
-    # Fallback sentiment sample is active in tests -> a warning is expected.
-    assert out["warnings"]
+    # `warnings` is always present; whether it's non-empty depends on whether the
+    # sentiment CSV is available, so that is asserted in test_sentiment.py instead.
+    assert isinstance(out["warnings"], list)
 
 
 def test_ensembles_ranking(dataset, settings):
