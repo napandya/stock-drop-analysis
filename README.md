@@ -65,10 +65,22 @@ analysis is split into four sections:
 | **4 · Clustering & anomalies** | Unsupervised | **K-Means** (k chosen by **silhouette**), **PCA** for projection, **Isolation Forest** for anomaly detection | cluster profiles, drops recovered |
 
 Cross-cutting practices: feature scaling (`StandardScaler`) for scale-sensitive
-models, class-imbalance handling (balanced weights / `scale_pos_weight` /
-stratified splits), a fixed `random_state` for reproducibility, and deliberate
-**leakage avoidance** — `ret_1d` is excluded from the feature set because
-`is_drop` is derived from it.
+models, class-imbalance handling (balanced weights / `scale_pos_weight`), a fixed
+`random_state` for reproducibility, and deliberate **leakage avoidance** —
+`ret_1d` is excluded from the feature set because `is_drop` is derived from it.
+
+### Time-aware validation
+
+The stock models predict a same-day outcome, so the supervised sections
+(regression, drop-classification, ensembles) are evaluated with a **chronological
+out-of-sample split** (last 30% of dates) plus **purged walk-forward CV** — an
+expanding window with a 5-day embargo between train and test, since several
+features use trailing windows that would otherwise straddle the boundary
+(`core/validation.py`). Each section reports the mean ± std of its metrics across
+folds. This replaces a random `train_test_split`, which trained on the future and
+inflated the scores; the walk-forward F1 on the rare drop class is far more sober
+and honest. (The NLP sentiment task keeps a random split — it is not temporal;
+clustering/anomaly detection is unsupervised.)
 
 ### Drop attribution: systematic vs. idiosyncratic
 
