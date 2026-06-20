@@ -1,0 +1,18 @@
+[project]
+name = "stock-drops-backend"
+version = "1.0.0"
+description = "Identify and rank the drivers behind significant stock price drops."
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["E501"]
