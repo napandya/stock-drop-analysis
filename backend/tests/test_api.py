@@ -61,3 +61,18 @@ def test_analyze_ensembles():
     body = r.json()
     assert body["ranking"]
     assert "dataset" in body and body["dataset"]["synthetic"] is True
+
+
+def test_datasource_error_maps_to_503(monkeypatch):
+    """A failed upstream fetch must surface as 503 with a typed error body --
+    this is the exact path the distutils / pandas-datareader breakage hit."""
+    from app.exceptions import DataSourceError
+    import app.services.analysis_service as svc
+
+    def _boom():
+        raise DataSourceError("upstream unreachable")
+
+    monkeypatch.setattr(svc, "run_all", _boom)
+    r = client.get("/api/analyze")
+    assert r.status_code == 503
+    assert r.json()["error"] == "DataSourceError"

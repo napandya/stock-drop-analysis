@@ -80,8 +80,16 @@ def analyze_all() -> dict:
 
 
 # --------------------------------------------------------------------------
-# Serve the static frontend (mounted last so /api/* wins)
+# Serve the built React frontend (mounted last so /api/* wins).
+# Run ``npm run build`` in ../frontend to produce the dist/ bundle. During UI
+# development use ``npm run dev`` instead (Vite serves on :5173 and proxies to
+# this API), so the absence of dist/ here is expected and not an error.
 # --------------------------------------------------------------------------
-_FRONTEND = Path(__file__).resolve().parent.parent.parent / "frontend"
-if _FRONTEND.exists():
-    app.mount("/", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.exists():
+    app.mount("/", StaticFiles(directory=str(_FRONTEND_DIST), html=True), name="frontend")
+else:
+    logger.warning(
+        "Frontend bundle not found at %s -- run 'npm run build' in frontend/, "
+        "or use 'npm run dev' for the Vite dev server.", _FRONTEND_DIST,
+    )

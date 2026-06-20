@@ -69,21 +69,61 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True).merge(market_df, on="date", how="left")
 
 
-def _load_macro(settings: Settings) -> pd.DataFrame:
-    from pandas_datareader import data as pdr
+#: FRED's public CSV export endpoint -- stable, keyless and dependency-free.
+_FRED_CSV_URL = "https://fred.stlouisfed.org/graph/fredgraph.csv"
 
-    @_retryer(settings)
-    def _download() -> pd.DataFrame:
-        series = pdr.DataReader(list(settings.fred_series), "fred",
-                                settings.date_start, settings.date_end)
-        if series is None or series.empty:
-            raise ValueError("FRED returned an empty frame.")
-        return series
 
-    series = _download().rename(columns=settings.fred_series)
+def _parse_fred_csv(text: str, settings: Settings) -> pd.DataFrame:
+    """Parse a FRED ``fredgraph.csv`` payload into the macro feature frame.
+
+    Pulled out as a pure function so it can be unit-tested without the network.
+    FRED marks missing observations with ``"."`` and the date column has been
+    ``DATE`` (legacy) or ``observation_date`` (current) over the years -- handle
+    both so a future rename does not silently break the pipeline.
+    """
+    import io
+
+    raw = pd.read_csv(io.StringIO(text))
+    date_col = next((c for c in ("observation_date", "DATE", "date") if c in raw.columns),
+                    raw.columns[0])
+    raw = raw.rename(columns={date_col: "date"})
+    raw["date"] = pd.to_datetime(raw["date"])
+
+    # FRED uses "." for missing values; coerce every series to numeric.
+    for code in settings.fred_series:
+        if code not in raw.columns:
+            raise ValueError(f"FRED response missing series '{code}'.")
+        raw[code] = pd.to_numeric(raw[code], errors="coerce")
+
+    series = raw.rename(columns=settings.fred_series).set_index("date")
     series["cpi_yoy"] = series["cpi"].pct_change(12) * 100.0
     macro = series[["treasury_10y", "cpi_yoy"]].ffill().reset_index()
-    return macro.rename(columns={"DATE": "date"})
+    if macro.empty:
+        raise ValueError("FRED returned an empty frame.")
+    return macro
+
+
+def _load_macro(settings: Settings) -> pd.DataFrame:
+    import requests
+
+    @_retryer(settings)
+    def _download() -> str:
+        resp = requests.get(
+            _FRED_CSV_URL,
+            params={
+                "id": ",".join(settings.fred_series),
+                "cosd": settings.date_start,
+                "coed": settings.date_end,
+            },
+            headers={"User-Agent": "stock-drop-analysis/1.0"},
+            timeout=settings.fetch_timeout_seconds,
+        )
+        resp.raise_for_status()
+        if not resp.text.strip():
+            raise ValueError("FRED returned an empty response.")
+        return resp.text
+
+    return _parse_fred_csv(_download(), settings)
 
 
 # --------------------------------------------------------------------------
