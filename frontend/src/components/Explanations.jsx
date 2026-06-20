@@ -64,6 +64,21 @@ export function Explanations({ data }) {
       <p className="eyebrow">Per-company · drivers of the fall</p>
       <h2 id="why-h">{data.title}</h2>
 
+      <p className="section-intro">
+        For each company we take its worst drop day(s) and rank the drivers by
+        <strong> model importance × how abnormal each was that day</strong> (only in the
+        direction associated with drops). The badges classify the fall; the bar shows each
+        driver's contribution and <strong>σ</strong> is how many standard deviations it sat
+        from normal.
+      </p>
+
+      <ul className="why-legend" aria-label="Legend">
+        <li><span className="attr-badge sys">Market / sector-driven</span> the broad market or sector did most of it (beta)</li>
+        <li><span className="attr-badge idio">Stock-specific</span> something specific to the company drove it</li>
+        <li><span className="attr-badge earnings miss">Earnings miss</span> fell on/around an earnings report, with the EPS surprise</li>
+        <li><span className="macro-note">10y ±bp / near FOMC</span> a rates/macro catalyst that day</li>
+      </ul>
+
       <div className="why-grid">
         {data.explanations.map((c) => (
           <div className="why-card" key={c.ticker}>

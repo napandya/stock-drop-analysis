@@ -4,34 +4,32 @@ import { fmt, humanize } from "../format.js";
 // readers and sighted users get a consistent reading order.
 export function MetricsTable({ rows, caption }) {
   if (!rows || !rows.length) return null;
-  const cols = Object.keys(rows[0]);
+  // Union of keys across all rows so ragged rows (e.g. sentiment models that
+  // only report accuracy) keep stable columns and show "—" for inapplicable
+  // cells instead of "undefined".
+  const cols = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+  const isNumCol = (c) => rows.some((r) => typeof r[c] === "number");
   return (
     <div className="table-wrap" role="region" aria-label={caption} tabIndex={0}>
       <table>
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>
           <tr>
-            {cols.map((c) => {
-              const isNum = typeof rows[0][c] === "number";
-              return (
-                <th key={c} scope="col" className={isNum ? "num" : undefined}>
-                  {humanize(c)}
-                </th>
-              );
-            })}
+            {cols.map((c) => (
+              <th key={c} scope="col" className={isNumCol(c) ? "num" : undefined}>
+                {humanize(c)}
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
           {rows.map((r, i) => (
             <tr key={i}>
-              {cols.map((c) => {
-                const isNum = typeof r[c] === "number";
-                return (
-                  <td key={c} className={isNum ? "num" : undefined}>
-                    {String(fmt(r[c]))}
-                  </td>
-                );
-              })}
+              {cols.map((c) => (
+                <td key={c} className={isNumCol(c) ? "num" : undefined}>
+                  {String(fmt(r[c]))}
+                </td>
+              ))}
             </tr>
           ))}
         </tbody>
