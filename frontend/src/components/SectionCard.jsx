@@ -1,5 +1,25 @@
 import { MetricsTable, RankingTable } from "./Tables.jsx";
 import { Figures } from "./Figures.jsx";
+import { SECTION_INTRO, SECTION_GLOSSARY, FEATURE_GLOSSARY, humanize } from "../format.js";
+
+// Collapsible "what the terms mean" block. Native <details> = keyboard- and
+// screen-reader-friendly with no extra state.
+function Glossary({ terms, summary = "What do these terms mean?" }) {
+  if (!terms || !terms.length) return null;
+  return (
+    <details className="glossary">
+      <summary>{summary}</summary>
+      <dl>
+        {terms.map(([term, def]) => (
+          <div className="glossary-row" key={term}>
+            <dt>{term}</dt>
+            <dd>{def}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
+}
 
 function StatRow({ stats }) {
   return (
@@ -46,6 +66,10 @@ export function SectionCard({ index, sectionKey, data }) {
       </p>
       <h2 id={`sec-${sectionKey}`}>{data.title || sectionKey}</h2>
 
+      {SECTION_INTRO[sectionKey] && (
+        <p className="section-intro">{SECTION_INTRO[sectionKey]}</p>
+      )}
+
       {(data.warnings || []).map((w, i) => (
         <p className="warn-line" key={i} role="note">
           <span aria-hidden="true">⚠ </span>
@@ -54,8 +78,19 @@ export function SectionCard({ index, sectionKey, data }) {
       ))}
 
       {data.ranking && <RankingTable ranking={data.ranking} />}
+      {/* For the driver ranking, explain what each driver actually is. */}
+      {data.ranking && (
+        <Glossary
+          summary="What do these drivers mean?"
+          terms={data.ranking.map((r) => [
+            humanize(r.feature),
+            FEATURE_GLOSSARY[r.feature] || "engineered driver feature",
+          ])}
+        />
+      )}
       {data.metrics && <MetricsTable rows={data.metrics} caption={`${data.title} metrics`} />}
       {data.validation && <Validation validation={data.validation} />}
+      <Glossary terms={SECTION_GLOSSARY[sectionKey]} />
 
       {a && (
         <StatRow
