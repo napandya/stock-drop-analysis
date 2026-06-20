@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from app.config import Settings
+from app.core.earnings import add_earnings_context
 from app.core.factors import add_factor_decomposition
 from app.core.features import ANALYSIS_COLUMNS, FEATURE_COLUMNS, label_drops
 from app.core.macro_calendar import add_macro_context
@@ -64,7 +65,14 @@ def generate_synthetic_panel(settings: Settings, n_days: int = 750) -> pd.DataFr
     panel["vix_change"] = panel.groupby("ticker")["vix_close"].pct_change()
     panel["is_drop"] = label_drops(panel["ret_1d"], settings).astype(int)
 
+    # Synthetic quarterly earnings (~every 63 trading days) with random surprise.
+    ev_rows = [{"ticker": tkr, "date": pd.Timestamp(d),
+                "eps_surprise": float(rng.normal(2, 8))}
+               for tkr in settings.tickers for d in dates[::63]]
+    events = pd.DataFrame(ev_rows)
+
     panel = add_factor_decomposition(panel, window=settings.factor_window)
     panel = add_macro_context(panel)
+    panel = add_earnings_context(panel, events, settings)
 
     return panel.dropna(subset=FEATURE_COLUMNS + ["ret_1d"])[_OUTPUT].reset_index(drop=True)

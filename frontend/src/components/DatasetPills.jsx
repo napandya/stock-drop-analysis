@@ -25,6 +25,11 @@ export function DatasetPills({ dataset }) {
           <b>{ds.drop_attribution["stock-specific"]}</b> stock-specific
         </span>
       )}
+      {ds.earnings_driven_drops != null && ds.earnings_driven_drops > 0 && (
+        <span className="pill" title="Drops that landed on or around an earnings announcement">
+          <b>{ds.earnings_driven_drops}</b> near earnings
+        </span>
+      )}
       <span className="pill">
         {ds.date_start} → {ds.date_end}
       </span>

@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 
 from app.config import Settings
+from app.core.earnings import add_earnings_context
 from app.core.factors import add_factor_decomposition
 from app.core.macro_calendar import add_macro_context
 from app.exceptions import InsufficientDataError
@@ -33,7 +34,7 @@ FEATURE_COLUMNS: list[str] = [
 #: as model features. ``near_fomc`` is excluded from the NaN-drop subset so early
 #: rows (before betas can be estimated) are still usable for the classifiers.
 ANALYSIS_COLUMNS = ["sector_ret", "systematic_ret", "idio_ret", "idio_z",
-                    "rate_chg_bp", "near_fomc"]
+                    "rate_chg_bp", "near_fomc", "near_earnings", "eps_surprise"]
 
 _REQUIRED_OUTPUT = (FEATURE_COLUMNS + ["ret_1d", "is_drop", "ticker", "sector", "date"]
                     + ANALYSIS_COLUMNS)
@@ -50,7 +51,8 @@ def label_drops(returns: pd.Series, settings: Settings) -> pd.Series:
     return returns <= settings.drop_threshold
 
 
-def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings) -> pd.DataFrame:
+def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings,
+                   earnings_events: pd.DataFrame | None = None) -> pd.DataFrame:
     """Engineer per-stock, per-day driver features and the drop label.
 
     Parameters
@@ -58,6 +60,8 @@ def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings
     prices : long-format frame with date, ticker, close, volume, sector,
              market_close, vix_close.
     macro  : daily frame with date, treasury_10y, cpi_yoy.
+    earnings_events : optional [ticker, date, eps_surprise] used to tag drops
+             that landed on/around an earnings announcement.
     """
     if prices.empty:
         raise InsufficientDataError("Price frame is empty; nothing to engineer.")
@@ -94,9 +98,10 @@ def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings
 
     df["is_drop"] = label_drops(df["ret_1d"], settings).astype("Int64")
 
-    # Attribution layers (systematic vs idiosyncratic, macro context).
+    # Attribution layers (systematic vs idiosyncratic, macro and earnings context).
     df = add_factor_decomposition(df, window=settings.factor_window)
     df = add_macro_context(df)
+    df = add_earnings_context(df, earnings_events, settings)
 
     clean = df.dropna(subset=FEATURE_COLUMNS + ["ret_1d", "is_drop"]).copy()
     clean["is_drop"] = clean["is_drop"].astype(int)

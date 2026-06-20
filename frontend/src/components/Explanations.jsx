@@ -4,9 +4,19 @@ const ATTR_LABEL = {
   mixed: "Mixed",
 };
 
+// Earnings catalyst tag: whether the fall landed on/around an earnings report,
+// and the EPS surprise (a miss is the classic single-name crash cause).
+function EarningsTag({ earnings }) {
+  if (!earnings || !earnings.near_earnings) return null;
+  const s = earnings.eps_surprise;
+  let label = "On earnings";
+  if (s != null) label = s < 0 ? `Earnings miss ${s}%` : `Earnings beat +${s}%, fell anyway`;
+  return <span className={`attr-badge earnings${s != null && s < 0 ? " miss" : ""}`}>{label}</span>;
+}
+
 // A badge classifying the fall as systematic vs idiosyncratic, plus any macro
 // context (rate move that day, proximity to an FOMC meeting).
-function Attribution({ attribution, macro }) {
+function Attribution({ attribution, macro, earnings }) {
   const a = attribution || {};
   const cls =
     a.type === "stock-specific" ? "idio" : a.type === "market/sector-driven" ? "sys" : "mix";
@@ -29,6 +39,7 @@ function Attribution({ attribution, macro }) {
           {share != null && <b> {Math.round(share * 100)}%</b>}
         </span>
       )}
+      <EarningsTag earnings={earnings} />
       {rateNote && <span className="macro-note">{rateNote}</span>}
       {macro && macro.near_fomc && <span className="macro-note">near FOMC</span>}
     </div>
@@ -72,7 +83,7 @@ export function Explanations({ data }) {
                   <span className="why-date">{e.date}</span>
                   <span className="why-return">{e.return_pct}%</span>
                 </div>
-                <Attribution attribution={e.attribution} macro={e.macro} />
+                <Attribution attribution={e.attribution} macro={e.macro} earnings={e.earnings} />
                 <ul className="why-reasons">
                   {e.reasons.map((r) => (
                     <li key={r.feature}>
