@@ -13,8 +13,61 @@ from typing import Literal
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.exceptions import ConfigurationError
+
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 PROJECT_ROOT = BASE_DIR.parent                              # stock_drops_app/
+
+#: Curated universe offered in the frontend picker. Users may also add any other
+#: Yahoo Finance symbol; those get the "Unknown" sector (sector is metadata only,
+#: never a model feature).
+TICKER_CATALOG: list[dict[str, str]] = [
+    {"ticker": "AAPL", "name": "Apple", "sector": "Technology"},
+    {"ticker": "MSFT", "name": "Microsoft", "sector": "Technology"},
+    {"ticker": "NVDA", "name": "NVIDIA", "sector": "Technology"},
+    {"ticker": "AMD", "name": "AMD", "sector": "Technology"},
+    {"ticker": "INTC", "name": "Intel", "sector": "Technology"},
+    {"ticker": "META", "name": "Meta Platforms", "sector": "Communication Services"},
+    {"ticker": "GOOGL", "name": "Alphabet", "sector": "Communication Services"},
+    {"ticker": "NFLX", "name": "Netflix", "sector": "Communication Services"},
+    {"ticker": "SNAP", "name": "Snap", "sector": "Communication Services"},
+    {"ticker": "DIS", "name": "Walt Disney", "sector": "Communication Services"},
+    {"ticker": "AMZN", "name": "Amazon", "sector": "Consumer Discretionary"},
+    {"ticker": "TSLA", "name": "Tesla", "sector": "Consumer Discretionary"},
+    {"ticker": "NKE", "name": "Nike", "sector": "Consumer Discretionary"},
+    {"ticker": "F", "name": "Ford", "sector": "Consumer Discretionary"},
+    {"ticker": "BA", "name": "Boeing", "sector": "Industrials"},
+    {"ticker": "JPM", "name": "JPMorgan Chase", "sector": "Financials"},
+    {"ticker": "BAC", "name": "Bank of America", "sector": "Financials"},
+    {"ticker": "PYPL", "name": "PayPal", "sector": "Financials"},
+    {"ticker": "COIN", "name": "Coinbase", "sector": "Financials"},
+    {"ticker": "UBER", "name": "Uber", "sector": "Industrials"},
+]
+
+_CATALOG_SECTORS = {row["ticker"]: row["sector"] for row in TICKER_CATALOG}
+
+#: Bounds on a user selection: enough stocks for the pooled models to be
+#: meaningful, few enough to keep a request responsive.
+MIN_TICKERS = 2
+MAX_TICKERS = 8
+
+
+def build_tickers(symbols: list[str]) -> dict[str, str]:
+    """Normalise a user-supplied symbol list into a ``{ticker: sector}`` dict.
+
+    Upper-cases, strips, de-duplicates (order-preserving) and validates the
+    count. Sector comes from the catalog or defaults to ``"Unknown"``.
+    """
+    seen: dict[str, str] = {}
+    for raw in symbols or []:
+        sym = str(raw).strip().upper()
+        if sym and sym not in seen:
+            seen[sym] = _CATALOG_SECTORS.get(sym, "Unknown")
+    if len(seen) < MIN_TICKERS:
+        raise ConfigurationError(f"Select at least {MIN_TICKERS} tickers.")
+    if len(seen) > MAX_TICKERS:
+        raise ConfigurationError(f"Select at most {MAX_TICKERS} tickers.")
+    return seen
 
 
 class Settings(BaseSettings):

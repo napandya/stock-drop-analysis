@@ -14,7 +14,7 @@ from tenacity import (RetryError, retry, retry_if_exception_type,
 from app.config import Settings, get_settings
 from app.core.features import build_features
 from app.core.synthetic import generate_synthetic_panel
-from app.exceptions import DataSourceError
+from app.exceptions import ConfigurationError, DataSourceError, StockDropsError
 from app.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -58,6 +58,17 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
     vix = raw[settings.vix_index]["Close"].rename("vix_close")
     market_df = pd.concat([market, vix], axis=1).reset_index()
     market_df.columns = ["date", "market_close", "vix_close"]
+
+    # A mistyped or delisted symbol comes back absent or all-NaN. Surface those
+    # as a 400-level ConfigurationError naming the offenders, rather than letting
+    # a KeyError bubble up as an opaque 503.
+    available = set(raw.columns.get_level_values(0))
+    invalid = [t for t in settings.tickers
+               if t not in available or raw[t]["Close"].dropna().empty]
+    if invalid:
+        raise ConfigurationError(
+            "No price data for: " + ", ".join(invalid)
+            + ". Check the ticker symbol(s).")
 
     frames = []
     for tkr, sector in settings.tickers.items():
@@ -204,6 +215,8 @@ def get_modeling_dataset(settings: Settings | None = None,
             logger.info("Fetching prices (yfinance) and macro (FRED)...")
             prices = _load_prices(settings)
             macro = _load_macro(settings)
+        except StockDropsError:
+            raise  # domain errors (e.g. invalid tickers) keep their own status
         except (RetryError, Exception) as exc:  # noqa: BLE001 - re-typed below
             raise DataSourceError(
                 f"Could not retrieve market/macro data after "

@@ -7,10 +7,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from app.config import Settings, get_settings
+from app.config import Settings, build_tickers, get_settings
 from app.core.data_pipeline import get_modeling_dataset
+from app.exceptions import InsufficientDataError, ModelError
 from app.logging_config import get_logger
-from app.models import classification, clustering, ensembles, regression
+from app.models import classification, clustering, ensembles, explain, regression
 
 logger = get_logger(__name__)
 
@@ -47,10 +48,35 @@ def run_section(section: str, settings: Settings | None = None) -> dict:
     return result
 
 
+def _run_sections(data: pd.DataFrame, settings: Settings) -> dict:
+    """Run every section, but degrade gracefully: a section that can't run on
+    this particular selection (e.g. clustering with too few drops) becomes a
+    titled placeholder with a warning instead of failing the whole request."""
+    sections = {}
+    for key, (title, module) in SECTIONS.items():
+        try:
+            sections[key] = module.run(data, settings)
+        except (InsufficientDataError, ModelError) as exc:
+            logger.warning("Section '%s' skipped: %s", key, exc)
+            sections[key] = {"title": title, "metrics": [], "warnings": [str(exc)]}
+    return sections
+
+
 def run_all(settings: Settings | None = None) -> dict:
     settings = settings or get_settings()
     data = get_modeling_dataset(settings)
-    out = {"dataset": dataset_summary(data, settings), "sections": {}}
-    for key, (_, module) in SECTIONS.items():
-        out["sections"][key] = module.run(data, settings)
-    return out
+    return {"dataset": dataset_summary(data, settings),
+            "sections": _run_sections(data, settings)}
+
+
+def run_selection(tickers: list[str], settings: Settings | None = None) -> dict:
+    """Run the full pipeline on a user-chosen set of tickers and add
+    per-company explanations of why each fell."""
+    base = settings or get_settings()
+    custom = base.model_copy(update={"tickers": build_tickers(tickers)})
+    data = get_modeling_dataset(custom)
+    return {
+        "dataset": dataset_summary(data, custom),
+        "sections": _run_sections(data, custom),
+        "explanations": explain.explain_drops(data, custom),
+    }
