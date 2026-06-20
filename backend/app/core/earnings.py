@@ -63,11 +63,17 @@ def add_earnings_context(panel: pd.DataFrame, events: pd.DataFrame | None,
     weekend, since reports after the close move the next trading day).
     """
     panel = panel.copy()
-    panel["date"] = pd.to_datetime(panel["date"])
+    # Coerce to a common datetime resolution: yfinance prices land as
+    # datetime64[s] on pandas 3.0 while parsed earnings dates are [us], and
+    # merge_asof refuses to join keys of differing resolution.
+    panel["date"] = pd.to_datetime(panel["date"]).astype("datetime64[ns]")
     panel["near_earnings"] = False
     panel["eps_surprise"] = np.nan
     if events is None or events.empty:
         return panel
+
+    events = events.copy()
+    events["date"] = pd.to_datetime(events["date"]).astype("datetime64[ns]")
 
     tol = pd.Timedelta(days=settings.earnings_event_window)
     for tkr, ev in events.groupby("ticker"):

@@ -30,6 +30,21 @@ def test_add_earnings_context_tags_window_and_surprise():
     assert not out.loc[out["date"] == pd.Timestamp("2022-01-03"), "near_earnings"].iloc[0]
 
 
+def test_add_earnings_context_mismatched_datetime_resolution():
+    """Regression: yfinance prices are datetime64[s] while parsed earnings dates
+    are [us]; merge_asof must not choke on the differing resolution."""
+    s = Settings(earnings_event_window=4)
+    panel = _panel()
+    panel["date"] = panel["date"].astype("datetime64[s]")          # like yfinance
+    events = pd.DataFrame({"ticker": ["X"], "date": [pd.Timestamp("2022-01-13")],
+                           "eps_surprise": [-8.5]})
+    events["date"] = events["date"].astype("datetime64[us]")       # like parsed earnings
+
+    out = earnings.add_earnings_context(panel, events, s)           # must not raise
+    assert out["near_earnings"].any()
+    assert (out.loc[out["near_earnings"], "eps_surprise"] == -8.5).all()
+
+
 def test_add_earnings_context_handles_no_events():
     out = earnings.add_earnings_context(_panel(), pd.DataFrame(
         columns=["ticker", "date", "eps_surprise"]), Settings())
