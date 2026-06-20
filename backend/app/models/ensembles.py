@@ -9,11 +9,11 @@ from __future__ import annotations
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (accuracy_score, f1_score, roc_auc_score, roc_curve)
-from sklearn.model_selection import train_test_split
 from xgboost import XGBClassifier
 
 from app.config import Settings, get_settings
 from app.core.features import FEATURE_COLUMNS
+from app.core.validation import chrono_holdout, cv_summary
 from app.exceptions import ModelError
 from app.logging_config import get_logger
 from app.models._plot import NAVY, fig_to_base64
@@ -25,8 +25,9 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
     settings = settings or get_settings()
     try:
         X, y = data[FEATURE_COLUMNS], data["is_drop"]
-        Xtr, Xte, ytr, yte = train_test_split(
-            X, y, test_size=0.25, random_state=settings.random_state, stratify=y)
+        # Chronological out-of-sample split so the ROC/ranking are not leaked.
+        tr, te = chrono_holdout(data["date"])
+        Xtr, Xte, ytr, yte = X[tr], X[te], y[tr], y[te]
         n_pos = max(int(ytr.sum()), 1)
         scale_pos_weight = (len(ytr) - n_pos) / n_pos
 
@@ -58,6 +59,22 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
         ranking = [{"feature": f, "importance": float(v)}
                    for f, v in imp["mean"].items()]
 
+        # Walk-forward stability of the Random Forest across time. A fold whose
+        # test block has a single class is unusable for ROC-AUC, so skip it.
+        def _fit_score(xa, ya, xb, yb):
+            if ya.nunique() < 2 or yb.nunique() < 2:
+                return None
+            m = RandomForestClassifier(n_estimators=150, max_depth=8,
+                                       class_weight="balanced",
+                                       random_state=settings.random_state, n_jobs=-1)
+            m.fit(xa, ya)
+            proba = m.predict_proba(xb)[:, 1]
+            return {"ROC_AUC": float(roc_auc_score(yb, proba)),
+                    "F1": float(f1_score(yb, (proba >= 0.5).astype(int), zero_division=0))}
+
+        validation = cv_summary(X, y, data["date"], _fit_score)
+        validation["scheme"] = "chronological holdout (last 30%, 5-day embargo) + walk-forward CV"
+
         import matplotlib.pyplot as plt
         fig1, ax = plt.subplots(figsize=(8, 5))
         order = imp.sort_values("mean")
@@ -82,6 +99,7 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
         "title": "Ensembles & Driver Ranking",
         "metrics": rows,
         "ranking": ranking,
+        "validation": validation,
         "figures": {"feature_importance": fig_to_base64(fig1),
                     "roc": fig_to_base64(fig2)},
     }

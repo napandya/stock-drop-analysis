@@ -9,11 +9,11 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeRegressor
 
 from app.config import Settings, get_settings
 from app.core.features import FEATURE_COLUMNS
+from app.core.validation import chrono_holdout, cv_summary
 from app.exceptions import ModelError
 from app.logging_config import get_logger
 from app.models._plot import DECLINE, NAVY, fig_to_base64
@@ -34,8 +34,9 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
     settings = settings or get_settings()
     try:
         X, y = data[FEATURE_COLUMNS], data["ret_1d"]
-        Xtr, Xte, ytr, yte = train_test_split(
-            X, y, test_size=0.25, random_state=settings.random_state)
+        # Chronological out-of-sample split (no look-ahead) instead of a random one.
+        tr, te = chrono_holdout(data["date"])
+        Xtr, Xte, ytr, yte = X[tr], X[te], y[tr], y[te]
 
         rows = []
         lin1 = LinearRegression().fit(Xtr[["market_ret"]], ytr)
@@ -47,6 +48,15 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
         tree = DecisionTreeRegressor(max_depth=5, random_state=settings.random_state)
         tree.fit(Xtr, ytr)
         rows.append(_metrics("Decision Tree (depth=5)", yte, tree.predict(Xte)))
+
+        # Walk-forward stability of the multiple-linear model across time.
+        def _fit_score(xa, ya, xb, yb):
+            p = LinearRegression().fit(xa, ya).predict(xb)
+            return {"R2": float(r2_score(yb, p)),
+                    "RMSE": float(np.sqrt(mean_squared_error(yb, p)))}
+
+        validation = cv_summary(X, y, data["date"], _fit_score)
+        validation["scheme"] = "chronological holdout (last 30%, 5-day embargo) + walk-forward CV"
 
         import matplotlib.pyplot as plt
         fig, ax = plt.subplots(figsize=(6, 6))
@@ -64,5 +74,6 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
     return {
         "title": "Regression -- Drop Magnitude",
         "metrics": rows,
+        "validation": validation,
         "figures": {"pred_vs_actual": fig_to_base64(fig)},
     }
