@@ -18,6 +18,15 @@ from app.exceptions import ConfigurationError
 BASE_DIR = Path(__file__).resolve().parent.parent          # backend/
 PROJECT_ROOT = BASE_DIR.parent                              # stock_drops_app/
 
+#: FinancialPhraseBank agreement level -> "sentence@sentiment" file shipped with
+#: the dataset. Higher agreement = less label noise.
+SENTIMENT_AGREEMENT_FILES = {
+    "all": "Sentences_AllAgree.txt",
+    "75": "Sentences_75Agree.txt",
+    "66": "Sentences_66Agree.txt",
+    "50": "Sentences_50Agree.txt",
+}
+
 #: Curated universe offered in the frontend picker. Users may also add any other
 #: Yahoo Finance symbol; those get the "Unknown" sector (sector is metadata only,
 #: never a model feature).
@@ -120,10 +129,26 @@ class Settings(BaseSettings):
 
     # -- Paths ---------------------------------------------------------------
     data_dir: Path = BASE_DIR / "data"
-    sentiment_csv_name: str = "all-data.csv"
+    #: Default sentiment CSV filename (the Kaggle download is "all-data.csv";
+    #: this repo ships "FinancialPhraseBank.csv"). Override via env if needed.
+    sentiment_csv_name: str = "FinancialPhraseBank.csv"
+    #: Which FinancialPhraseBank annotator-agreement subset to train on. Higher
+    #: agreement = cleaner labels (and the levels the source paper benchmarks):
+    #: "all" (100%), "75", "66", "50", or "csv" to use the comma-separated file.
+    sentiment_agreement: Literal["all", "75", "66", "50", "csv"] = "75"
 
     @property
     def sentiment_csv(self) -> Path:
+        """Resolve the sentiment dataset: the chosen agreement file if present,
+        otherwise the CSV (by known names), otherwise the default path."""
+        candidates: list[str] = []
+        if self.sentiment_agreement in SENTIMENT_AGREEMENT_FILES:
+            candidates.append(SENTIMENT_AGREEMENT_FILES[self.sentiment_agreement])
+        candidates += [self.sentiment_csv_name, "FinancialPhraseBank.csv", "all-data.csv"]
+        for name in dict.fromkeys(candidates):
+            path = self.data_dir / name
+            if path.exists():
+                return path
         return self.data_dir / self.sentiment_csv_name
 
     def ensure_dirs(self) -> None:

@@ -174,9 +174,14 @@ numbers are illustrative — switch it off for anything that goes in the paper.
 - **Prices, macro & earnings** download automatically on first request (yfinance
   + FRED). The default study window is ~10 years (2015–2024) for more regimes,
   walk-forward folds and earnings events; override via `DATE_START`/`DATE_END`.
-- **News sentiment** (Member 2): download the Kaggle FinancialPhraseBank
-  (`ankurzing/sentiment-analysis-for-financial-news`) and put `all-data.csv` in
-  `backend/data/`. Without it, that one model falls back to a tiny sample.
+- **News sentiment** (Member 2): the FinancialPhraseBank dataset
+  (`ankurzing/sentiment-analysis-for-financial-news`, CC BY-NC-SA — see
+  `backend/data/License.txt`) ships in the repo. By default the model trains on
+  the **>75% annotator-agreement** subset (`Sentences_75Agree.txt`); set
+  `SENTIMENT_AGREEMENT` to `all` (100%, cleanest), `66`, `50`, or `csv` to use a
+  different subset (higher agreement = less label noise = higher accuracy). With
+  no dataset present it falls back to a tiny built-in sample (flagged with a
+  warning).
 
 Configure tickers, dates, and the drop threshold in `backend/app/config.py` or via
 environment variables (e.g. `DROP_THRESHOLD=-0.07`).
