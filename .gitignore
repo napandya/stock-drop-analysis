@@ -217,6 +217,11 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# FinancialPhraseBank: keep the curated CSV/txt + License/README, ignore the raw
+# extracted archive folder and any zip downloads.
+backend/data/FinancialPhraseBank-v1.0/
+backend/data/*.zip
+
 # Node / frontend (Vite)
 node_modules/
 frontend/dist/

@@ -97,13 +97,33 @@ def _drop_classification(data: pd.DataFrame, settings: Settings) -> dict:
     return {"metrics": rows, "figure": fig_to_base64(fig), "validation": validation}
 
 
+def _read_sentiment_dataset(path) -> pd.DataFrame:
+    """Read FinancialPhraseBank in either shipped layout.
+
+    ``.txt`` agreement files are ``sentence@sentiment`` (split on the *last* @,
+    since a sentence may contain one); the ``.csv`` is ``sentiment,"headline"``.
+    Both are latin-1 with assorted line endings.
+    """
+    if str(path).lower().endswith(".txt"):
+        rows = []
+        for line in path.read_text(encoding="latin-1").splitlines():
+            line = line.strip()
+            if "@" in line:
+                sentence, sentiment = line.rsplit("@", 1)
+                rows.append((sentiment.strip().lower(), sentence.strip()))
+        return pd.DataFrame(rows, columns=["sentiment", "headline"])
+    return pd.read_csv(path, encoding="latin-1", header=None,
+                       names=["sentiment", "headline"])
+
+
 def _load_sentiment(settings: Settings) -> tuple[pd.DataFrame, bool]:
-    if settings.sentiment_csv.exists():
-        df = pd.read_csv(settings.sentiment_csv, encoding="latin-1", header=None,
-                         names=["sentiment", "headline"])
-        return df.dropna(), True
-    logger.warning("FinancialPhraseBank CSV not found at %s; using tiny sample.",
-                   settings.sentiment_csv)
+    path = settings.sentiment_csv
+    if path.exists():
+        df = _read_sentiment_dataset(path).dropna()
+        if not df.empty:
+            logger.info("Sentiment dataset: %s (%d rows).", path.name, len(df))
+            return df, True
+    logger.warning("FinancialPhraseBank dataset not found at %s; using tiny sample.", path)
     return pd.DataFrame(_FALLBACK_SENTIMENT, columns=["sentiment", "headline"]), False
 
 
