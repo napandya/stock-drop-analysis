@@ -18,6 +18,7 @@ from sklearn.preprocessing import StandardScaler
 
 from app.config import Settings, get_settings
 from app.core.features import FEATURE_COLUMNS
+from app.core.validation import chrono_holdout, cv_summary
 from app.exceptions import ModelError
 from app.logging_config import get_logger
 from app.models._plot import fig_to_base64
@@ -47,8 +48,9 @@ def _confusion_fig(cm, labels, title):
 
 def _drop_classification(data: pd.DataFrame, settings: Settings) -> dict:
     X, y = data[FEATURE_COLUMNS], data["is_drop"]
-    Xtr, Xte, ytr, yte = train_test_split(
-        X, y, test_size=0.25, random_state=settings.random_state, stratify=y)
+    # Chronological out-of-sample split (no look-ahead); cannot stratify by time.
+    tr, te = chrono_holdout(data["date"])
+    Xtr, Xte, ytr, yte = X[tr], X[te], y[tr], y[te]
     scaler = StandardScaler().fit(Xtr)
     Xtr_s, Xte_s = scaler.transform(Xtr), scaler.transform(Xte)
 
@@ -63,17 +65,36 @@ def _drop_classification(data: pd.DataFrame, settings: Settings) -> dict:
         model.fit(Xtr_s, ytr)
         pred = model.predict(Xte_s)
         acc = accuracy_score(yte, pred)
-        rep = classification_report(yte, pred, target_names=["no-drop", "drop"],
+        # labels=[0, 1] so the report is well-defined even if a class is absent.
+        rep = classification_report(yte, pred, labels=[0, 1],
+                                    target_names=["no-drop", "drop"],
                                     zero_division=0, output_dict=True)
         rows.append({"model": name, "accuracy": float(acc),
                      "precision_drop": float(rep["drop"]["precision"]),
                      "recall_drop": float(rep["drop"]["recall"]),
                      "f1_drop": float(rep["drop"]["f1-score"])})
         if acc > best[0]:
-            best = (acc, name, confusion_matrix(yte, pred))
+            best = (acc, name, confusion_matrix(yte, pred, labels=[0, 1]))
+
+    # Walk-forward stability of logistic regression (scaled per fold).
+    def _fit_score(xa, ya, xb, yb):
+        if ya.nunique() < 2 or yb.nunique() < 2:
+            return None
+        sc = StandardScaler().fit(xa)
+        m = LogisticRegression(max_iter=1000, class_weight="balanced",
+                               random_state=settings.random_state)
+        m.fit(sc.transform(xa), ya)
+        pred = m.predict(sc.transform(xb))
+        return {"accuracy": float(accuracy_score(yb, pred)),
+                "f1_drop": float(classification_report(
+                    yb, pred, labels=[0, 1], output_dict=True,
+                    zero_division=0)["1"]["f1-score"])}
+
+    validation = cv_summary(X, y, data["date"], _fit_score)
+    validation["scheme"] = "chronological holdout (last 30%, 5-day embargo) + walk-forward CV"
     fig = _confusion_fig(best[2], ["no-drop", "drop"],
                          f"Drop Classification ({best[1]})")
-    return {"metrics": rows, "figure": fig_to_base64(fig)}
+    return {"metrics": rows, "figure": fig_to_base64(fig), "validation": validation}
 
 
 def _load_sentiment(settings: Settings) -> tuple[pd.DataFrame, bool]:
@@ -136,6 +157,7 @@ def run(data: pd.DataFrame, settings: Settings | None = None) -> dict:
     return {
         "title": "Classification & Sentiment",
         "metrics": drop["metrics"] + sent["metrics"],
+        "validation": drop["validation"],   # time-series CV applies to the drop task
         "warnings": ([] if sent["using_real_dataset"]
                      else ["Sentiment used a tiny built-in sample; download the "
                            "FinancialPhraseBank CSV for reportable results."]),
