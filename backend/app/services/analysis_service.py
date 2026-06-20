@@ -38,6 +38,9 @@ def _attribution_mix(data: pd.DataFrame) -> dict:
 
 def dataset_summary(data: pd.DataFrame, settings: Settings) -> dict:
     n_drops = int(data["is_drop"].sum())
+    drops = data[data["is_drop"] == 1]
+    earnings_drops = (int(drops["near_earnings"].sum())
+                      if "near_earnings" in drops.columns else 0)
     return {
         "rows": int(len(data)),
         "tickers": sorted(data["ticker"].unique().tolist()),
@@ -46,6 +49,7 @@ def dataset_summary(data: pd.DataFrame, settings: Settings) -> dict:
         "drop_events": n_drops,
         "drop_rate": round(n_drops / len(data), 4),
         "drop_attribution": _attribution_mix(data),
+        "earnings_driven_drops": earnings_drops,
         "synthetic": settings.use_synthetic,
     }
 

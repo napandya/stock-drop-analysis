@@ -60,6 +60,7 @@ def test_explain_drops_structure(selection_dataset):
             assert event["attribution"]["type"] in {
                 "market/sector-driven", "stock-specific", "mixed", "unknown"}
             assert "rate_chg_bp" in event["macro"] and "near_fomc" in event["macro"]
+            assert "near_earnings" in event["earnings"]
             for r in event["reasons"]:
                 assert r["contribution"] > 0              # only drop-ward reasons kept
                 assert isinstance(r["explanation"], str) and r["explanation"]

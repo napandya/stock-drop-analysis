@@ -19,6 +19,7 @@ import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 
 from app.config import Settings, get_settings
+from app.core.earnings import earnings_context_for
 from app.core.factors import drop_attribution
 from app.core.features import FEATURE_COLUMNS
 from app.core.macro_calendar import macro_context_for
@@ -89,6 +90,7 @@ def explain_drops(data: pd.DataFrame, settings: Settings | None = None,
                     "attribution": drop_attribution(
                         row.get("systematic_ret", float("nan")), float(row["ret_1d"])),
                     "macro": macro_context_for(row),
+                    "earnings": earnings_context_for(row),
                     "reasons": reasons,
                 })
             explanations.append({

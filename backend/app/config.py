@@ -90,7 +90,7 @@ class Settings(BaseSettings):
     vix_index: str = "^VIX"
 
     # -- Study window --------------------------------------------------------
-    date_start: str = "2021-01-01"
+    date_start: str = "2015-01-01"      # ~10y: more regimes, folds and earnings
     date_end: str = "2024-12-31"
 
     # -- Drop definition -----------------------------------------------------
@@ -104,7 +104,9 @@ class Settings(BaseSettings):
     )
 
     # -- Attribution ---------------------------------------------------------
-    factor_window: int = 60     # trailing days for rolling market/sector betas
+    factor_window: int = 60          # trailing days for rolling market/sector betas
+    earnings_history_limit: int = 60  # quarters of earnings to request per ticker
+    earnings_event_window: int = 4    # calendar days around an earnings date to tag
 
     # -- Resiliency ----------------------------------------------------------
     fetch_max_attempts: int = 4         # retries for transient data-source errors

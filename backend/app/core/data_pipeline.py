@@ -191,6 +191,17 @@ def _load_macro(settings: Settings) -> pd.DataFrame:
     return _finalize_macro(merged, settings)
 
 
+def _load_earnings(settings: Settings) -> pd.DataFrame:
+    """Best-effort earnings events; an empty frame on any failure (no tags)."""
+    from app.core.earnings import fetch_earnings_events
+
+    try:
+        return fetch_earnings_events(list(settings.tickers), settings)
+    except Exception as exc:  # noqa: BLE001 - earnings are optional context
+        logger.warning("Earnings overlay unavailable: %s", exc)
+        return pd.DataFrame(columns=["ticker", "date", "eps_surprise"])
+
+
 # --------------------------------------------------------------------------
 # Public entry point
 # --------------------------------------------------------------------------
@@ -232,7 +243,10 @@ def get_modeling_dataset(settings: Settings | None = None,
                 f"Could not retrieve market/macro data after "
                 f"{settings.fetch_max_attempts} attempts: {exc}"
             ) from exc
-        data = build_features(prices, macro, settings)
+        # Earnings are a best-effort catalyst overlay -- a failure must not take
+        # down the whole analysis, so it is fetched outside the hard-fail block.
+        earnings = _load_earnings(settings)
+        data = build_features(prices, macro, settings, earnings)
 
     n_drops = int(data["is_drop"].sum())
     logger.info("Built panel: %d stock-days, %d drops (%.1f%%).",
