@@ -97,6 +97,14 @@ to predict would be leakage). *Honest limitation:* true CPI/PCE/dot-plot
 **surprises** (actual vs. consensus) need a paid macro feed and are not included;
 the rate-move magnitude is the proxy used instead.
 
+**Earnings catalysts** (`core/earnings.py`): the most common single-name crash
+cause. Yahoo provides announcement dates **and** the EPS surprise (reported vs.
+consensus) back ~12 years for established names, so each drop is tagged
+`near_earnings` with the matched `eps_surprise` — e.g. META's −26% on
+2022-02-03 lands on a −4.1% earnings miss. Best-effort and date-aligned (it
+degrades to "untagged" if Yahoo's earnings feed is unavailable), and like the
+other attribution layers it is never a model feature.
+
 ---
 
 ## Quick start
@@ -163,7 +171,9 @@ numbers are illustrative — switch it off for anything that goes in the paper.
 
 ## Real data
 
-- **Prices & macro** download automatically on first request (yfinance + FRED).
+- **Prices, macro & earnings** download automatically on first request (yfinance
+  + FRED). The default study window is ~10 years (2015–2024) for more regimes,
+  walk-forward folds and earnings events; override via `DATE_START`/`DATE_END`.
 - **News sentiment** (Member 2): download the Kaggle FinancialPhraseBank
   (`ankurzing/sentiment-analysis-for-financial-news`) and put `all-data.csv` in
   `backend/data/`. Without it, that one model falls back to a tiny sample.
