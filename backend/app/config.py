@@ -103,6 +103,9 @@ class Settings(BaseSettings):
         default_factory=lambda: {"DGS10": "treasury_10y", "CPIAUCSL": "cpi"}
     )
 
+    # -- Attribution ---------------------------------------------------------
+    factor_window: int = 60     # trailing days for rolling market/sector betas
+
     # -- Resiliency ----------------------------------------------------------
     fetch_max_attempts: int = 4         # retries for transient data-source errors
     fetch_backoff_seconds: float = 1.5  # exponential backoff base

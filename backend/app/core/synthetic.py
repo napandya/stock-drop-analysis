@@ -9,13 +9,20 @@ import numpy as np
 import pandas as pd
 
 from app.config import Settings
-from app.core.features import FEATURE_COLUMNS, label_drops
+from app.core.factors import add_factor_decomposition
+from app.core.features import ANALYSIS_COLUMNS, FEATURE_COLUMNS, label_drops
+from app.core.macro_calendar import add_macro_context
 
-_OUTPUT = FEATURE_COLUMNS + ["ret_1d", "is_drop", "ticker", "sector", "date"]
+_OUTPUT = (FEATURE_COLUMNS + ["ret_1d", "is_drop", "ticker", "sector", "date"]
+           + ANALYSIS_COLUMNS)
 
 
 def generate_synthetic_panel(settings: Settings, n_days: int = 750) -> pd.DataFrame:
-    """Return a clean modelling panel built from random-but-plausible data."""
+    """Return a clean modelling panel built from random-but-plausible data.
+
+    Returns carry a genuine market + sector factor structure plus idiosyncratic
+    crashes, so the factor decomposition has something real to recover offline.
+    """
     rng = np.random.default_rng(settings.random_state)
     dates = pd.bdate_range(settings.date_start, periods=n_days)
 
@@ -24,18 +31,24 @@ def generate_synthetic_panel(settings: Settings, n_days: int = 750) -> pd.DataFr
     treasury = np.clip(2.5 + np.cumsum(rng.normal(0, 0.02, n_days)) * 0.05, 0.5, 5)
     cpi = np.clip(3 + np.cumsum(rng.normal(0, 0.03, n_days)) * 0.05, 0, 9)
 
+    # One sector factor per distinct sector, correlated with the market.
+    sectors = list(dict.fromkeys(settings.tickers.values()))
+    sector_rets = {sec: rng.uniform(0.7, 1.1) * market_ret + rng.normal(0, 0.006, n_days)
+                   for sec in sectors}
+
     frames = []
     for tkr, sector in settings.tickers.items():
-        beta = rng.uniform(0.8, 1.8)
-        ret = beta * market_ret + rng.normal(0, 0.018, n_days)
+        sret = sector_rets[sector]
+        bm, bs = rng.uniform(0.6, 1.3), rng.uniform(0.3, 0.9)
+        ret = bm * market_ret + bs * sret + rng.normal(0, 0.012, n_days)
         for _ in range(int(rng.integers(2, 5))):          # inject idiosyncratic crashes
             ret[int(rng.integers(30, n_days))] -= rng.uniform(0.10, 0.28)
         volume = np.abs(rng.uniform(1e7, 5e7) * (1 + 3 * np.abs(ret)
                         + rng.normal(0, 0.1, n_days)))
         frames.append(pd.DataFrame({
             "date": dates, "ticker": tkr, "sector": sector,
-            "ret_1d": ret, "market_ret": market_ret, "volume": volume,
-            "vix_close": vix, "treasury_10y": treasury, "cpi_yoy": cpi,
+            "ret_1d": ret, "market_ret": market_ret, "sector_ret": sret,
+            "volume": volume, "vix_close": vix, "treasury_10y": treasury, "cpi_yoy": cpi,
         }))
 
     panel = pd.concat(frames, ignore_index=True).sort_values(["ticker", "date"])
@@ -50,5 +63,8 @@ def generate_synthetic_panel(settings: Settings, n_days: int = 750) -> pd.DataFr
     panel["vix"] = panel["vix_close"]
     panel["vix_change"] = panel.groupby("ticker")["vix_close"].pct_change()
     panel["is_drop"] = label_drops(panel["ret_1d"], settings).astype(int)
+
+    panel = add_factor_decomposition(panel, window=settings.factor_window)
+    panel = add_macro_context(panel)
 
     return panel.dropna(subset=FEATURE_COLUMNS + ["ret_1d"])[_OUTPUT].reset_index(drop=True)

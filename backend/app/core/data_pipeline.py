@@ -42,7 +42,11 @@ def _retryer(settings: Settings):
 def _load_prices(settings: Settings) -> pd.DataFrame:
     import yfinance as yf
 
-    symbols = list(settings.tickers) + [settings.market_index, settings.vix_index]
+    from app.core.factors import SECTOR_ETF, sector_etfs_for
+
+    etfs = sector_etfs_for(settings.tickers.values())
+    symbols = (list(settings.tickers) + [settings.market_index, settings.vix_index]
+               + etfs)
 
     @_retryer(settings)
     def _download() -> pd.DataFrame:
@@ -54,6 +58,7 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
         return raw
 
     raw = _download()
+    available = set(raw.columns.get_level_values(0))
     market = raw[settings.market_index]["Close"].rename("market_close")
     vix = raw[settings.vix_index]["Close"].rename("vix_close")
     market_df = pd.concat([market, vix], axis=1).reset_index()
@@ -62,7 +67,6 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
     # A mistyped or delisted symbol comes back absent or all-NaN. Surface those
     # as a 400-level ConfigurationError naming the offenders, rather than letting
     # a KeyError bubble up as an opaque 503.
-    available = set(raw.columns.get_level_values(0))
     invalid = [t for t in settings.tickers
                if t not in available or raw[t]["Close"].dropna().empty]
     if invalid:
@@ -70,10 +74,16 @@ def _load_prices(settings: Settings) -> pd.DataFrame:
             "No price data for: " + ", ".join(invalid)
             + ". Check the ticker symbol(s).")
 
+    # Per-date sector ETF close, used as the sector factor. A failed ETF download
+    # just leaves sector_close NaN -> market-only decomposition for that name.
+    etf_close = {etf: raw[etf]["Close"] for etf in etfs if etf in available}
+
     frames = []
     for tkr, sector in settings.tickers.items():
         sub = raw[tkr][["Close", "Volume"]].copy()
         sub.columns = ["close", "volume"]
+        etf = SECTOR_ETF.get(sector)
+        sub["sector_close"] = etf_close[etf] if etf in etf_close else pd.NA
         sub = sub.reset_index().rename(columns={"Date": "date"})
         sub["ticker"], sub["sector"] = tkr, sector
         frames.append(sub)
