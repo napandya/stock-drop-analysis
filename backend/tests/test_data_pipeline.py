@@ -99,3 +99,42 @@ def test_parse_fred_csv_missing_series_raises():
     bad = "observation_date,DGS10\n2021-02-01,1.16\n"  # CPIAUCSL absent
     with pytest.raises(ValueError):
         data_pipeline._parse_fred_csv(bad, s)
+
+
+def test_parse_fred_csv_rejects_html_with_clear_error():
+    """An HTML error/rate-limit page must raise an actionable ValueError, not a
+    cryptic pandas 'Error tokenizing data'."""
+    s = Settings()
+    html = "<!DOCTYPE html>\n<html><body><p>Service unavailable</p></body></html>\n"
+    with pytest.raises(ValueError, match="did not return CSV"):
+        data_pipeline._parse_fred_csv(html, s)
+
+
+def test_read_fred_csv_single_series():
+    """Per-series payloads (how _load_macro now fetches) parse to date + code."""
+    single = "observation_date,DGS10\n2021-02-01,1.16\n2021-02-02,1.13\n"
+    frame = data_pipeline._read_fred_csv(single)
+    assert list(frame.columns) == ["date", "DGS10"]
+    assert pd.api.types.is_datetime64_any_dtype(frame["date"])
+
+
+def test_cpi_yoy_computed_on_monthly_observations():
+    """CPI year-over-year must reflect a 12-*month* change, not 12 daily rows.
+
+    Build 13 monthly CPI points growing 0.5%/month alongside a daily-cadence
+    treasury column; the 13th month's YoY should be a real, non-NaN value.
+    """
+    s = Settings()
+    rows = ["observation_date,DGS10,CPIAUCSL"]
+    cpi = 100.0
+    for i in range(13):  # 2021-01 .. 2022-01
+        year = 2021 + (i // 12)
+        month = (i % 12) + 1
+        rows.append(f"{year}-{month:02d}-01,1.50,{cpi:.3f}")
+        cpi *= 1.005
+    macro = data_pipeline._parse_fred_csv("\n".join(rows) + "\n", s)
+
+    last = macro.iloc[-1]["cpi_yoy"]
+    assert pd.notna(last)
+    # 12 months of +0.5% compounding ≈ 6.17% YoY.
+    assert 5.5 < last < 7.0
