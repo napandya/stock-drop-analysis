@@ -50,7 +50,20 @@ logging instead of `print`, and a full **pytest** suite that runs offline.
 
 ```bash
 cd backend
-python -m venv venv && source venv/bin/activate     # Windows: venv\Scripts\activate
+python -m venv venv
+
+# macOS / Linux
+source venv/bin/activate
+
+# Windows (Git Bash)
+source venv/Scripts/activate
+
+# Windows (PowerShell)
+venv\Scripts\Activate.ps1
+
+# Windows (Command Prompt)
+venv\Scripts\activate.bat
+
 pip install -r requirements.txt
 
 # run the app (serves API + dashboard)
