@@ -19,6 +19,12 @@ export function DatasetPills({ dataset }) {
       <span className="pill">
         <b>{ds.drop_events}</b> drops ({(ds.drop_rate * 100).toFixed(1)}%)
       </span>
+      {ds.drop_attribution && (
+        <span className="pill" title="How drops split between market/sector moves and stock-specific shocks">
+          <b>{ds.drop_attribution["market/sector-driven"]}</b> market ·{" "}
+          <b>{ds.drop_attribution["stock-specific"]}</b> stock-specific
+        </span>
+      )}
       <span className="pill">
         {ds.date_start} → {ds.date_end}
       </span>

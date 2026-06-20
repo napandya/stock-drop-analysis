@@ -9,6 +9,7 @@ import pandas as pd
 
 from app.config import Settings, build_tickers, get_settings
 from app.core.data_pipeline import get_modeling_dataset
+from app.core.factors import drop_attribution
 from app.exceptions import InsufficientDataError, ModelError
 from app.logging_config import get_logger
 from app.models import classification, clustering, ensembles, explain, regression
@@ -24,6 +25,17 @@ SECTIONS = {
 }
 
 
+def _attribution_mix(data: pd.DataFrame) -> dict:
+    """Tally drops by systematic / stock-specific / mixed across the panel."""
+    drops = data[data["is_drop"] == 1]
+    counts = {"market/sector-driven": 0, "stock-specific": 0, "mixed": 0, "unknown": 0}
+    if "systematic_ret" in drops.columns:
+        for _, row in drops.iterrows():
+            kind = drop_attribution(row["systematic_ret"], row["ret_1d"])["type"]
+            counts[kind] = counts.get(kind, 0) + 1
+    return counts
+
+
 def dataset_summary(data: pd.DataFrame, settings: Settings) -> dict:
     n_drops = int(data["is_drop"].sum())
     return {
@@ -33,6 +45,7 @@ def dataset_summary(data: pd.DataFrame, settings: Settings) -> dict:
         "date_end": str(data["date"].max().date()),
         "drop_events": n_drops,
         "drop_rate": round(n_drops / len(data), 4),
+        "drop_attribution": _attribution_mix(data),
         "synthetic": settings.use_synthetic,
     }
 

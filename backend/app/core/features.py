@@ -12,6 +12,8 @@ import numpy as np
 import pandas as pd
 
 from app.config import Settings
+from app.core.factors import add_factor_decomposition
+from app.core.macro_calendar import add_macro_context
 from app.exceptions import InsufficientDataError
 
 #: Candidate driver features shared by every model.
@@ -27,7 +29,14 @@ FEATURE_COLUMNS: list[str] = [
     "cpi_yoy",
 ]
 
-_REQUIRED_OUTPUT = FEATURE_COLUMNS + ["ret_1d", "is_drop", "ticker", "sector", "date"]
+#: Attribution-only columns (same-day quantities): used to explain a drop, never
+#: as model features. ``near_fomc`` is excluded from the NaN-drop subset so early
+#: rows (before betas can be estimated) are still usable for the classifiers.
+ANALYSIS_COLUMNS = ["sector_ret", "systematic_ret", "idio_ret", "idio_z",
+                    "rate_chg_bp", "near_fomc"]
+
+_REQUIRED_OUTPUT = (FEATURE_COLUMNS + ["ret_1d", "is_drop", "ticker", "sector", "date"]
+                    + ANALYSIS_COLUMNS)
 
 
 def label_drops(returns: pd.Series, settings: Settings) -> pd.Series:
@@ -71,6 +80,12 @@ def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings
     df["vix"] = df["vix_close"]
     df["vix_change"] = df["vix_close"].pct_change()
 
+    # Sector factor return (per ticker so it never crosses ticker boundaries).
+    if "sector_close" in df.columns:
+        df["sector_ret"] = df.groupby("ticker")["sector_close"].pct_change()
+    else:
+        df["sector_ret"] = np.nan
+
     df["date"] = pd.to_datetime(df["date"])
     macro = macro.copy()
     macro["date"] = pd.to_datetime(macro["date"])
@@ -78,6 +93,10 @@ def build_features(prices: pd.DataFrame, macro: pd.DataFrame, settings: Settings
     df[["treasury_10y", "cpi_yoy"]] = df[["treasury_10y", "cpi_yoy"]].ffill()
 
     df["is_drop"] = label_drops(df["ret_1d"], settings).astype("Int64")
+
+    # Attribution layers (systematic vs idiosyncratic, macro context).
+    df = add_factor_decomposition(df, window=settings.factor_window)
+    df = add_macro_context(df)
 
     clean = df.dropna(subset=FEATURE_COLUMNS + ["ret_1d", "is_drop"]).copy()
     clean["is_drop"] = clean["is_drop"].astype(int)

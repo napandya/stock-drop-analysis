@@ -1,3 +1,40 @@
+const ATTR_LABEL = {
+  "market/sector-driven": "Market / sector-driven",
+  "stock-specific": "Stock-specific",
+  mixed: "Mixed",
+};
+
+// A badge classifying the fall as systematic vs idiosyncratic, plus any macro
+// context (rate move that day, proximity to an FOMC meeting).
+function Attribution({ attribution, macro }) {
+  const a = attribution || {};
+  const cls =
+    a.type === "stock-specific" ? "idio" : a.type === "market/sector-driven" ? "sys" : "mix";
+  const share =
+    a.type === "stock-specific"
+      ? a.idio_share
+      : a.type === "market/sector-driven"
+      ? a.systematic_share
+      : null;
+
+  const bp = macro && macro.rate_chg_bp;
+  const rateNote =
+    bp != null && Math.abs(bp) >= 5 ? `10y ${bp > 0 ? "+" : ""}${bp}bp` : null;
+
+  return (
+    <div className="why-tags">
+      {ATTR_LABEL[a.type] && (
+        <span className={`attr-badge ${cls}`}>
+          {ATTR_LABEL[a.type]}
+          {share != null && <b> {Math.round(share * 100)}%</b>}
+        </span>
+      )}
+      {rateNote && <span className="macro-note">{rateNote}</span>}
+      {macro && macro.near_fomc && <span className="macro-note">near FOMC</span>}
+    </div>
+  );
+}
+
 // Per-company explanations of the worst drop event(s). Each reason shows the
 // plain-language driver plus a small bar for its model contribution; the
 // z-score (how abnormal the day was) is shown as text so nothing relies on the
@@ -35,6 +72,7 @@ export function Explanations({ data }) {
                   <span className="why-date">{e.date}</span>
                   <span className="why-return">{e.return_pct}%</span>
                 </div>
+                <Attribution attribution={e.attribution} macro={e.macro} />
                 <ul className="why-reasons">
                   {e.reasons.map((r) => (
                     <li key={r.feature}>
