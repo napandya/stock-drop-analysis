@@ -12,6 +12,7 @@ tenacity>=8.2
 yfinance>=0.2.40
 pandas-datareader>=0.10
 vaderSentiment>=3.3
+setuptools>=68  # provides distutils shim (removed from stdlib in Python 3.12+)
 
 # dev / testing
 pytest>=8.0
