@@ -48,6 +48,30 @@ logging instead of `print`, and a full **pytest** suite that runs offline.
 
 ---
 
+## ML methods
+
+The task is framed around two targets per stock-day: a binary label
+**`is_drop`** (did the stock fall more than the threshold — default −5% — in one
+day?) and the continuous daily return **`ret_1d`**. Both are explained by nine
+engineered driver features (`market_ret`, `volume_z`, `volatility_20d`,
+`ret_prev`, `momentum_5d`, `vix`, `vix_change`, `treasury_10y`, `cpi_yoy`). The
+analysis is split into four sections:
+
+| Section | Type | Techniques | Reported |
+|---------|------|------------|----------|
+| **1 · Regression** | Supervised (magnitude) | Simple & Multiple **Linear Regression**, **Decision Tree** regressor | R², MAE, RMSE |
+| **2 · Classification & Sentiment** | Supervised + NLP | **Logistic Regression** & **Gaussian Naive Bayes** for drop vs. no-drop; **TF-IDF** + **Multinomial NB** / **Logistic Regression** and a **VADER** lexicon baseline for news sentiment | accuracy, precision/recall/F1, confusion matrices |
+| **3 · Ensembles & driver ranking** | Supervised | **Random Forest** + **XGBoost** classifiers; feature importances averaged across both | accuracy, F1, **ROC-AUC**, ranked drop drivers |
+| **4 · Clustering & anomalies** | Unsupervised | **K-Means** (k chosen by **silhouette**), **PCA** for projection, **Isolation Forest** for anomaly detection | cluster profiles, drops recovered |
+
+Cross-cutting practices: feature scaling (`StandardScaler`) for scale-sensitive
+models, class-imbalance handling (balanced weights / `scale_pos_weight` /
+stratified splits), a fixed `random_state` for reproducibility, and deliberate
+**leakage avoidance** — `ret_1d` is excluded from the feature set because
+`is_drop` is derived from it.
+
+---
+
 ## Quick start
 
 ```bash
