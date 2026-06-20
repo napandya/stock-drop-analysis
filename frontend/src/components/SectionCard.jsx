@@ -14,6 +14,26 @@ function StatRow({ stats }) {
   );
 }
 
+// Out-of-sample validation summary: the honest, time-ordered metrics (mean ± std
+// across walk-forward folds) rather than a leaky random split.
+function Validation({ validation: v }) {
+  if (!v || !v.cv || !v.cv.length) return null;
+  return (
+    <div className="validation" role="note">
+      <span className="validation-label">
+        Out-of-sample · {v.n_folds}-fold walk-forward · {v.embargo_days}d embargo
+      </span>
+      <span className="validation-metrics">
+        {v.cv.map((c) => (
+          <span className="cv-metric" key={c.metric}>
+            {c.metric} <b>{c.mean}</b> ± {c.std}
+          </span>
+        ))}
+      </span>
+    </div>
+  );
+}
+
 // Renders one analysis section's results. Mirrors the shape returned by the
 // backend (`ranking`, `metrics`, `anomaly_detection`, `cluster_profiles`,
 // `figures`, `warnings`) and only shows the keys that are present.
@@ -35,6 +55,7 @@ export function SectionCard({ index, sectionKey, data }) {
 
       {data.ranking && <RankingTable ranking={data.ranking} />}
       {data.metrics && <MetricsTable rows={data.metrics} caption={`${data.title} metrics`} />}
+      {data.validation && <Validation validation={data.validation} />}
 
       {a && (
         <StatRow

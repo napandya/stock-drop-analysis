@@ -379,6 +379,43 @@ tbody tr:hover {
   position: relative;
 }
 
+/* ---- Validation (out-of-sample CV) -------------------------------- */
+.validation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 14px 0;
+  padding: 12px 14px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.validation-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.validation-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cv-metric {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 9px;
+}
+.cv-metric b {
+  color: var(--accent-strong);
+}
+
 /* ---- Stat row ----------------------------------------------------- */
 .stat-row {
   display: flex;
