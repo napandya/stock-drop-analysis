@@ -23,6 +23,7 @@ from app.core.earnings import earnings_context_for
 from app.core.factors import drop_attribution
 from app.core.features import FEATURE_COLUMNS
 from app.core.macro_calendar import macro_context_for
+from app.core.market_events import event_breakdown, event_for
 from app.exceptions import ModelError
 from app.logging_config import get_logger
 
@@ -49,7 +50,7 @@ def _phrase(feature: str, z: float) -> str:
 
 
 def explain_drops(data: pd.DataFrame, settings: Settings | None = None,
-                  worst_n: int = 2, top_features: int = 4) -> dict:
+                  worst_n: int = 3, top_features: int = 4) -> dict:
     """Return per-ticker explanations for each stock's worst drop event(s)."""
     settings = settings or get_settings()
     try:
@@ -91,6 +92,7 @@ def explain_drops(data: pd.DataFrame, settings: Settings | None = None,
                         row.get("systematic_ret", float("nan")), float(row["ret_1d"])),
                     "macro": macro_context_for(row),
                     "earnings": earnings_context_for(row),
+                    "event": event_for(row["date"]),
                     "reasons": reasons,
                 })
             explanations.append({
@@ -102,10 +104,15 @@ def explain_drops(data: pd.DataFrame, settings: Settings | None = None,
     except Exception as exc:  # noqa: BLE001
         raise ModelError(f"Explanation step failed: {exc}") from exc
 
+    # How the selection's drops cluster around documented global events.
+    drop_dates = data.loc[data["is_drop"] == 1, "date"]
+    backdrop = event_breakdown(drop_dates)
+
     logger.info("Per-company explanations built for %d tickers.", len(explanations))
     return {
         "title": "Why these stocks fell",
         "explanations": explanations,
+        "event_breakdown": backdrop,
         "global_importance": [
             {"feature": f, "importance": round(float(v), 4)}
             for f, v in importance.sort_values(ascending=False).items()

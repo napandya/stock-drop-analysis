@@ -97,6 +97,15 @@ to predict would be leakage). *Honest limitation:* true CPI/PCE/dot-plot
 **surprises** (actual vs. consensus) need a paid macro feed and are not included;
 the rate-move magnitude is the proxy used instead.
 
+**Global events** (`core/market_events.py`): each drop is matched against a
+curated calendar of documented market episodes (COVID-19 crash, 2022 Fed
+rate-hiking bear, Russia–Ukraine, SVB, etc.; most-specific window wins), so the
+per-company explanations read as a story — "a market-wide selloff (84%
+systematic) during the 2022 rate-hiking bear market" — and an aggregate "market
+backdrop" shows which events the selection's drops clustered around. (Curated
+macro events only; true per-ticker, per-day news sentiment would need a
+headlines feed and is not faked.)
+
 **Earnings catalysts** (`core/earnings.py`): the most common single-name crash
 cause. Yahoo provides announcement dates **and** the EPS surprise (reported vs.
 consensus) back ~12 years for established names, so each drop is tagged

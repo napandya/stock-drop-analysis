@@ -838,6 +838,55 @@ tbody tr:hover {
   color: var(--danger-ink);
   border-color: #f0c2bd;
 }
+.attr-badge.event-tag {
+  background: #eef3fb;
+  color: #2c4a7c;
+  border-color: #c5d6ee;
+}
+
+/* One-line narrative summarising each drop */
+.why-narrative {
+  margin: 2px 0 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+/* Market backdrop strip (aggregate event context) */
+.backdrop {
+  margin-top: 18px;
+  padding: 14px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+.backdrop-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+.backdrop-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.backdrop-chip {
+  font-size: 12.5px;
+  padding: 4px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--ink);
+}
+.backdrop-chip b {
+  color: var(--accent-strong);
+}
 .macro-note {
   font-size: 11.5px;
   padding: 3px 9px;
