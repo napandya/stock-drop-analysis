@@ -59,6 +59,7 @@ source venv/bin/activate
 source venv/Scripts/activate
 
 # Windows (PowerShell)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 venv\Scripts\Activate.ps1
 
 # Windows (Command Prompt)
@@ -73,6 +74,11 @@ python -m uvicorn app.main:app --reload --port 8000
 These activation commands assume your current directory is `backend/`. If you are
 already inside `backend/venv/`, use `source Scripts/activate` in Git Bash or move
 back up one level before following the quick-start commands.
+
+If PowerShell reports that scripts are disabled on your system, the
+`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass` command above only
+relaxes the policy for the current shell session and avoids changing the machine
+or user-wide execution policy.
 
 Open <http://127.0.0.1:8000> and click a section, or **Run full analysis**.
 
