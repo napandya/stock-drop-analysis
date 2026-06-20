@@ -510,6 +510,219 @@ tbody tr:hover {
   }
 }
 
+/* ---- Ticker picker ------------------------------------------------ */
+.picker {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 24px;
+}
+.picker-head h2 {
+  font-size: 18px;
+}
+.picker-sub {
+  margin: 4px 0 16px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.chip {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.chip:hover {
+  background: var(--surface-2);
+}
+.chip.on {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+.chip-sym {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 13px;
+}
+.chip.on .chip-sym {
+  color: var(--accent-strong);
+}
+.chip-name {
+  font-size: 11px;
+  color: var(--muted);
+}
+.chip.custom .chip-name {
+  color: var(--accent-strong);
+}
+
+.picker-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.custom-add {
+  display: flex;
+  gap: 8px;
+}
+.custom-add input {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  width: 200px;
+}
+.custom-add input::placeholder {
+  color: var(--muted);
+}
+.btn-secondary {
+  padding: 9px 16px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.picker-run {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.count {
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.count.over {
+  color: var(--danger-ink);
+  font-weight: 600;
+}
+.picker .run-all {
+  margin-top: 0;
+}
+.picker-hint {
+  margin: 12px 0 0;
+  color: var(--danger-ink);
+  font-size: 13px;
+}
+
+/* ---- Explanations (why these stocks fell) ------------------------- */
+.why-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.why-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  background: var(--surface);
+}
+.why-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.why-ticker {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+}
+.why-sector {
+  font-size: 12px;
+  color: var(--muted);
+}
+.why-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+.why-event {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 10px;
+}
+.why-event-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 8px;
+}
+.why-date {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
+.why-return {
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--danger-ink);
+}
+.why-reasons {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.why-reasons li {
+  font-size: 13px;
+}
+.why-reason-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+.why-z {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.why-bar {
+  display: block;
+  height: 6px;
+  min-width: 2px;
+  background: var(--accent);
+  opacity: 0.5;
+  border-radius: 999px;
+}
+.why-none {
+  color: var(--muted);
+  font-size: 13px;
+  font-style: italic;
+}
+
 /* ---- Reduced motion ----------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *,

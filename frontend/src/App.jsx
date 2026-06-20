@@ -1,13 +1,23 @@
 import { useEffect, useState, useCallback } from "react";
-import { getHealth, getSections, analyzeSection, analyzeAll } from "./api.js";
+import {
+  getHealth,
+  getSections,
+  getTickers,
+  analyzeSection,
+  analyzeAll,
+  analyzeSelection,
+} from "./api.js";
 import { Sidebar } from "./components/Sidebar.jsx";
 import { DatasetPills } from "./components/DatasetPills.jsx";
 import { SectionCard } from "./components/SectionCard.jsx";
+import { TickerPicker } from "./components/TickerPicker.jsx";
+import { Explanations } from "./components/Explanations.jsx";
 import { Loading, ErrorBanner, EmptyState } from "./components/States.jsx";
 
 export default function App() {
   const [sections, setSections] = useState([]);
   const [indexByKey, setIndexByKey] = useState({});
+  const [catalog, setCatalog] = useState([]);
   const [health, setHealth] = useState({ state: "", text: "checking backend…" });
 
   const [activeKey, setActiveKey] = useState(null);
@@ -29,6 +39,10 @@ export default function App() {
         setIndexByKey(Object.fromEntries(sections.map((s, i) => [s.key, i + 1])));
       })
       .catch((error) => setStatus({ phase: "error", message: "", error }));
+
+    getTickers()
+      .then(({ catalog }) => setCatalog(catalog))
+      .catch(() => setCatalog([]));
   }, []);
 
   // ---- actions -----------------------------------------------------------
@@ -58,6 +72,23 @@ export default function App() {
     }
   }, []);
 
+  const runSelection = useCallback(async (tickers) => {
+    setActiveKey(null);
+    setStatus({
+      phase: "loading",
+      message: `Analyzing ${tickers.length} companies…`,
+      error: null,
+    });
+    try {
+      const data = await analyzeSelection(tickers);
+      setDataset(data.dataset);
+      setResults({ mode: "all", payload: data });
+      setStatus({ phase: "done", message: "", error: null });
+    } catch (error) {
+      setStatus({ phase: "error", message: "", error });
+    }
+  }, []);
+
   // ---- results region ----------------------------------------------------
   function renderResults() {
     if (status.phase === "loading") return <Loading message={status.message} />;
@@ -73,9 +104,16 @@ export default function App() {
         />
       );
     }
-    return Object.entries(results.payload.sections).map(([key, sec]) => (
-      <SectionCard key={key} index={indexByKey[key]} sectionKey={key} data={sec} />
-    ));
+    return (
+      <>
+        {results.payload.explanations && (
+          <Explanations data={results.payload.explanations} />
+        )}
+        {Object.entries(results.payload.sections).map(([key, sec]) => (
+          <SectionCard key={key} index={indexByKey[key]} sectionKey={key} data={sec} />
+        ))}
+      </>
+    );
   }
 
   return (
@@ -104,6 +142,14 @@ export default function App() {
           </div>
           <DatasetPills dataset={dataset} />
         </header>
+
+        {catalog.length > 0 && (
+          <TickerPicker
+            catalog={catalog}
+            onAnalyze={runSelection}
+            running={status.phase === "loading"}
+          />
+        )}
 
         <section id="results" aria-live="polite" aria-busy={status.phase === "loading"}>
           {renderResults()}
