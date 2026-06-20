@@ -28,3 +28,27 @@ def _clear_dataset_cache():
 @pytest.fixture
 def dataset(settings):
     return get_modeling_dataset(settings)
+
+
+# --------------------------------------------------------------------------
+# Opt-in "live" tests: hit real data sources to catch format/dtype drift that
+# synthetic data can't. Skipped by default so the normal suite stays offline
+# and deterministic; run with `pytest --run-live`.
+# --------------------------------------------------------------------------
+def pytest_addoption(parser):
+    parser.addoption("--run-live", action="store_true", default=False,
+                     help="run tests marked @pytest.mark.live (require network).")
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers", "live: exercises real data sources (needs network); opt-in via --run-live.")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--run-live"):
+        return
+    skip = pytest.mark.skip(reason="needs --run-live (network access)")
+    for item in items:
+        if "live" in item.keywords:
+            item.add_marker(skip)
