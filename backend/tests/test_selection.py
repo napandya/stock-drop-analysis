@@ -50,6 +50,7 @@ def test_explain_drops_structure(selection_dataset):
     assert out["title"] == "Why these stocks fell"
     assert {e["ticker"] for e in out["explanations"]} == set(s.tickers)
     assert out["global_importance"]
+    assert "event_breakdown" in out          # market-event tie-in (may be empty)
 
     for company in out["explanations"]:
         assert company["total_drops"] >= 0
@@ -61,6 +62,7 @@ def test_explain_drops_structure(selection_dataset):
                 "market/sector-driven", "stock-specific", "mixed", "unknown"}
             assert "rate_chg_bp" in event["macro"] and "near_fomc" in event["macro"]
             assert "near_earnings" in event["earnings"]
+            assert "event" in event          # market-event label or None
             for r in event["reasons"]:
                 assert r["contribution"] > 0              # only drop-ward reasons kept
                 assert isinstance(r["explanation"], str) and r["explanation"]

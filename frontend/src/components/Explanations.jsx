@@ -15,8 +15,8 @@ function EarningsTag({ earnings }) {
 }
 
 // A badge classifying the fall as systematic vs idiosyncratic, plus any macro
-// context (rate move that day, proximity to an FOMC meeting).
-function Attribution({ attribution, macro, earnings }) {
+// context (rate move that day, proximity to an FOMC meeting) and the global event.
+function Attribution({ attribution, macro, earnings, event }) {
   const a = attribution || {};
   const cls =
     a.type === "stock-specific" ? "idio" : a.type === "market/sector-driven" ? "sys" : "mix";
@@ -39,9 +39,60 @@ function Attribution({ attribution, macro, earnings }) {
           {share != null && <b> {Math.round(share * 100)}%</b>}
         </span>
       )}
+      {event && (
+        <span className="attr-badge event-tag" title={event.description}>
+          {event.label}
+        </span>
+      )}
       <EarningsTag earnings={earnings} />
       {rateNote && <span className="macro-note">{rateNote}</span>}
       {macro && macro.near_fomc && <span className="macro-note">near FOMC</span>}
+    </div>
+  );
+}
+
+// One-line plain-English story for a drop, woven from the signals we have:
+// systematic vs idiosyncratic, the global event, earnings, and rates.
+function narrative(e) {
+  const a = e.attribution || {};
+  const parts = [];
+  if (a.type === "market/sector-driven")
+    parts.push(`A market-wide selloff (${Math.round((a.systematic_share || 0) * 100)}% systematic)`);
+  else if (a.type === "stock-specific")
+    parts.push(`A stock-specific drop (${Math.round((a.idio_share || 0) * 100)}% idiosyncratic)`);
+  else if (a.type === "mixed") parts.push("A mix of market and company-specific moves");
+  else parts.push("A sharp drop");
+
+  if (e.event) parts.push(`during the ${e.event.label}`);
+
+  const s = e.earnings && e.earnings.near_earnings ? e.earnings.eps_surprise : undefined;
+  if (e.earnings && e.earnings.near_earnings) {
+    if (s != null && s < 0) parts.push(`on an earnings miss (${s}%)`);
+    else if (s != null) parts.push(`around earnings (beat +${s}%)`);
+    else parts.push("around its earnings report");
+  }
+
+  const bp = e.macro && e.macro.rate_chg_bp;
+  if (bp != null && Math.abs(bp) >= 8) parts.push(`amid a ${bp > 0 ? "+" : ""}${bp}bp move in 10y yields`);
+  else if (e.macro && e.macro.near_fomc) parts.push("near an FOMC meeting");
+
+  return parts.join(" ") + ".";
+}
+
+// Aggregate context strip: which documented events the selection's drops
+// clustered around. Fills the space below the cards with real analysis.
+function MarketBackdrop({ breakdown }) {
+  if (!breakdown || !breakdown.length) return null;
+  return (
+    <div className="backdrop" role="note">
+      <span className="backdrop-label">Market backdrop · drops clustered around</span>
+      <span className="backdrop-items">
+        {breakdown.map((b) => (
+          <span className="backdrop-chip" key={b.label}>
+            {b.label} <b>×{b.count}</b>
+          </span>
+        ))}
+      </span>
     </div>
   );
 }
@@ -98,7 +149,13 @@ export function Explanations({ data }) {
                   <span className="why-date">{e.date}</span>
                   <span className="why-return">{e.return_pct}%</span>
                 </div>
-                <Attribution attribution={e.attribution} macro={e.macro} earnings={e.earnings} />
+                <p className="why-narrative">{narrative(e)}</p>
+                <Attribution
+                  attribution={e.attribution}
+                  macro={e.macro}
+                  earnings={e.earnings}
+                  event={e.event}
+                />
                 <ul className="why-reasons">
                   {e.reasons.map((r) => (
                     <li key={r.feature}>
@@ -125,6 +182,8 @@ export function Explanations({ data }) {
           </div>
         ))}
       </div>
+
+      <MarketBackdrop breakdown={data.event_breakdown} />
     </article>
   );
 }
